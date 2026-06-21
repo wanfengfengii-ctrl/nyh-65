@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { ControlPoint, ProfileScheme, RepairMark, Unit, RestorationScheme, RestorationResult } from '@/types'
+import type { ControlPoint, ProfileScheme, RepairMark, Unit, RestorationScheme, RestorationResult, KeyPart, Dimensions } from '@/types'
 import { generateDefaultPoints, generateId } from '@/utils/geometry'
 import { generateRestorationSchemes, updateRestorationPoint, exportRestorationData } from '@/utils/restoration'
+import { api } from '@/lib/api'
 
 const STORAGE_KEY = 'ceramic_profile_schemes'
 const CURRENT_KEY = 'ceramic_profile_current'
@@ -16,6 +17,11 @@ export const useProfileStore = defineStore('profile', () => {
   const restorationSchemes = ref<RestorationScheme[]>([])
   const currentRestorationId = ref<string | null>(null)
   const restorationResult = ref<RestorationResult | null>(null)
+
+  const keyParts = ref<KeyPart[]>([])
+  const keyPartsDimensions = ref<Dimensions | null>(null)
+  const keyPartsLoading = ref<boolean>(false)
+  const keyPartsError = ref<string | null>(null)
 
   const currentScheme = computed<ProfileScheme | null>(() => {
     if (!currentSchemeId.value) return null
@@ -427,6 +433,41 @@ export const useProfileStore = defineStore('profile', () => {
     }
   }
 
+  async function identifyKeyParts(vesselTypeHint?: string): Promise<{ success: boolean; message?: string }> {
+    if (!currentScheme.value || controlPoints.value.length < 3) {
+      return { success: false, message: '控制点数量不足（至少需要3个）' }
+    }
+    keyPartsLoading.value = true
+    keyPartsError.value = null
+    try {
+      const res = await api.vesselProfiles.identifyKeyParts({
+        control_points: controlPoints.value,
+        unit: unit.value,
+        vessel_type_hint: vesselTypeHint,
+      })
+      if (res && res.success) {
+        keyParts.value = res.key_parts || []
+        keyPartsDimensions.value = res.dimensions || null
+        return { success: true }
+      } else {
+        keyPartsError.value = '识别失败'
+        return { success: false, message: '识别失败' }
+      }
+    } catch (e: any) {
+      console.error('识别关键部位失败:', e)
+      keyPartsError.value = e?.message || '网络请求失败'
+      return { success: false, message: e?.message || '网络请求失败' }
+    } finally {
+      keyPartsLoading.value = false
+    }
+  }
+
+  function clearKeyParts() {
+    keyParts.value = []
+    keyPartsDimensions.value = null
+    keyPartsError.value = null
+  }
+
   return {
     schemes,
     currentSchemeId,
@@ -440,6 +481,10 @@ export const useProfileStore = defineStore('profile', () => {
     currentRestoration,
     restorationResult,
     hasRestoration,
+    keyParts,
+    keyPartsDimensions,
+    keyPartsLoading,
+    keyPartsError,
     loadFromStorage,
     saveToStorage,
     createNewScheme,
@@ -463,5 +508,7 @@ export const useProfileStore = defineStore('profile', () => {
     setRestorationConfidence,
     exportRestoration,
     deleteRestoration,
+    identifyKeyParts,
+    clearKeyParts,
   }
 })

@@ -2,7 +2,7 @@
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import type { ControlPoint } from '@/types'
+import type { ControlPoint, KeyPart } from '@/types'
 import { useProfileStore } from '@/stores/profile'
 import { sampleCurvePoints, validateProfile } from '@/utils/geometry'
 
@@ -14,12 +14,32 @@ let camera: THREE.PerspectiveCamera | null = null
 let renderer: THREE.WebGLRenderer | null = null
 let controls: OrbitControls | null = null
 let latheMesh: THREE.Mesh | null = null
+let segmentMeshes: THREE.Mesh[] = []
 let wireframe: THREE.LineSegments | null = null
 let animationId: number | null = null
 
 const loading = ref(true)
 const autoRotate = ref(true)
 const showWireframe = ref(false)
+const showKeyParts3D = ref(true)
+
+const KEY_PART_HEX_COLORS: Record<string, number> = {
+  '底部': 0x8B5A2B,
+  '圈足': 0xA0522D,
+  '足': 0xA0522D,
+  '腹部': 0x5D8A66,
+  '腹': 0x5D8A66,
+  '肩部': 0x008080,
+  '肩': 0x008080,
+  '颈部': 0x7B1FA2,
+  '颈': 0x7B1FA2,
+  '口沿': 0xE53935,
+  '口': 0xE53935,
+}
+
+function getKeyPartHexColor(name: string): number {
+  return KEY_PART_HEX_COLORS[name] || 0x9E9E9E
+}
 
 const isValid = computed(() => validateProfile(store.controlPoints).isValid)
 
@@ -34,9 +54,11 @@ function buildLathePoints(points: ControlPoint[]): THREE.Vector2[] {
     .map(p => new THREE.Vector2(p.x * scale, (maxY - p.y) * scale))
 }
 
-function createCeramicMaterial(): THREE.MeshPhysicalMaterial {
+function createCeramicMaterial(colorHex: number = 0xd4c5a0): THREE.MeshPhysicalMaterial {
+  const baseColor = new THREE.Color(colorHex)
+  const lightened = baseColor.clone().lerp(new THREE.Color(0xffffff), 0.55)
   return new THREE.MeshPhysicalMaterial({
-    color: 0xd4c5a0,
+    color: lightened,
     metalness: 0.1,
     roughness: 0.35,
     clearcoat: 0.6,
@@ -47,6 +69,14 @@ function createCeramicMaterial(): THREE.MeshPhysicalMaterial {
     transparent: true,
     opacity: 0.92,
   })
+}
+
+function clearSegmentMeshes() {
+  for (const m of segmentMeshes) {
+    if (scene) scene.remove(m)
+    m.geometry.dispose()
+  }
+  segmentMeshes = []
 }
 
 function updateGeometry() {
@@ -61,6 +91,7 @@ function updateGeometry() {
     wireframe.geometry.dispose()
     wireframe = null
   }
+  clearSegmentMeshes()
 
   if (!isValid.value) {
     loading.value = false
@@ -73,22 +104,67 @@ function updateGeometry() {
     return
   }
 
-  const geometry = new THREE.LatheGeometry(pts, 64)
-  geometry.computeVertexNormals()
-  latheMesh = new THREE.Mesh(geometry, createCeramicMaterial())
-  scene.add(latheMesh)
+  const sampled = sampleCurvePoints(store.controlPoints, 40)
+  const ys = sampled.map(p => p.y)
+  const maxY = Math.max(...ys)
+  const minY = Math.min(...ys)
+  const scale = 0.02
 
-  const wireGeo = new THREE.WireframeGeometry(geometry)
-  wireframe = new THREE.LineSegments(
-    wireGeo,
-    new THREE.LineBasicMaterial({
-      color: 0x5d8a66,
-      transparent: true,
-      opacity: 0.35,
-    })
-  )
-  wireframe.visible = showWireframe.value
-  scene.add(wireframe)
+  const useSegmentColors = showKeyParts3D.value && store.keyParts.length >= 2
+
+  if (useSegmentColors) {
+    const parts = [...store.keyParts].sort((a, b) => (a.startY ?? 0) - (b.startY ?? 0))
+    for (const part of parts) {
+      let { startY, endY } = part
+      if (startY === undefined || endY === undefined) continue
+      startY = Math.max(minY, Math.min(maxY, startY))
+      endY = Math.max(minY, Math.min(maxY, endY))
+      if (Math.abs(endY - startY) < 0.5) continue
+
+      const segPts: THREE.Vector2[] = []
+      for (const p of sampled) {
+        if (p.y >= Math.min(startY, endY) - 0.01 && p.y <= Math.max(startY, endY) + 0.01) {
+          segPts.push(new THREE.Vector2(p.x * scale, (maxY - p.y) * scale))
+        }
+      }
+      if (segPts.length < 2) continue
+      segPts.sort((a, b) => b.y - a.y)
+
+      const color = getKeyPartHexColor(part.name)
+      const segGeo = new THREE.LatheGeometry(segPts, 64)
+      segGeo.computeVertexNormals()
+      const segMesh = new THREE.Mesh(segGeo, createCeramicMaterial(color))
+      scene.add(segMesh)
+      segmentMeshes.push(segMesh)
+    }
+
+    if (segmentMeshes.length === 0) {
+      const geometry = new THREE.LatheGeometry(pts, 64)
+      geometry.computeVertexNormals()
+      latheMesh = new THREE.Mesh(geometry, createCeramicMaterial())
+      scene.add(latheMesh)
+    }
+  } else {
+    const geometry = new THREE.LatheGeometry(pts, 64)
+    geometry.computeVertexNormals()
+    latheMesh = new THREE.Mesh(geometry, createCeramicMaterial())
+    scene.add(latheMesh)
+  }
+
+  const mainGeo = latheMesh?.geometry || segmentMeshes[0]?.geometry
+  if (mainGeo) {
+    const wireGeo = new THREE.WireframeGeometry(mainGeo)
+    wireframe = new THREE.LineSegments(
+      wireGeo,
+      new THREE.LineBasicMaterial({
+        color: 0x5d8a66,
+        transparent: true,
+        opacity: 0.35,
+      })
+    )
+    wireframe.visible = showWireframe.value
+    scene.add(wireframe)
+  }
 
   if (controls) {
     controls.target.set(0, 1.5, 0)
@@ -158,8 +234,11 @@ function initThree() {
 function animate() {
   animationId = requestAnimationFrame(animate)
   if (controls) {
-    if (autoRotate.value && latheMesh) {
-      latheMesh.rotation.y += 0.005
+    if (autoRotate.value) {
+      if (latheMesh) latheMesh.rotation.y += 0.005
+      for (const m of segmentMeshes) {
+        m.rotation.y += 0.005
+      }
       if (wireframe) wireframe.rotation.y += 0.005
     }
     controls.update()
@@ -188,7 +267,7 @@ function resetCamera() {
 }
 
 watch(
-  () => store.controlPoints,
+  () => [store.controlPoints, store.keyParts, showKeyParts3D.value],
   () => {
     updateGeometry()
   },
@@ -214,6 +293,7 @@ onUnmounted(() => {
     }
   }
   if (latheMesh) latheMesh.geometry.dispose()
+  clearSegmentMeshes()
   if (wireframe) wireframe.geometry.dispose()
 })
 
@@ -223,7 +303,7 @@ defineExpose({ resetCamera })
 <template>
   <div class="relative w-full h-full bg-[#F5F0E8] rounded-lg overflow-hidden border border-[#E8DFC9]">
     <div ref="containerRef" class="w-full h-full" />
-    <div class="absolute top-3 left-3 flex gap-2 items-center">
+    <div class="absolute top-3 left-3 flex flex-wrap gap-2 items-center">
       <button
         :class="[
           'px-2 py-1 text-xs rounded border transition-all',
@@ -243,11 +323,41 @@ defineExpose({ resetCamera })
         线框模式
       </button>
       <button
+        :class="[
+          'px-2 py-1 text-xs rounded border transition-all',
+          showKeyParts3D && store.keyParts.length >= 2 ? 'bg-[#7B1FA2] text-white border-[#7B1FA2]' : 'bg-white text-gray-700 border-gray-300'
+        ]"
+        :disabled="store.keyParts.length < 2"
+        :title="store.keyParts.length < 2 ? '请先识别关键部位' : '按部位分段着色显示'"
+        @click="showKeyParts3D = !showKeyParts3D"
+      >
+        🎨 部位着色
+      </button>
+      <button
         class="px-2 py-1 text-xs rounded border bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
         @click="resetCamera"
       >
         重置视角
       </button>
+    </div>
+    <div
+      v-if="showKeyParts3D && store.keyParts.length >= 2"
+      class="absolute top-3 right-3 bg-white/90 backdrop-blur rounded-lg border border-[#E8DFC9] p-2 text-[10px] max-w-[140px]"
+    >
+      <div class="font-semibold text-gray-700 mb-1">部位图例</div>
+      <div class="space-y-0.5">
+        <div
+          v-for="(part, idx) in [...store.keyParts].sort((a,b)=>(a.startY??0)-(b.startY??0)).slice(0,6)"
+          :key="idx"
+          class="flex items-center gap-1"
+        >
+          <span
+            class="inline-block w-3 h-3 rounded-sm border"
+            :style="{ backgroundColor: '#' + getKeyPartHexColor(part.name).toString(16).padStart(6, '0') + '55' }"
+          ></span>
+          <span class="text-gray-600 truncate">{{ part.name }}</span>
+        </div>
+      </div>
     </div>
     <div
       v-if="loading"
