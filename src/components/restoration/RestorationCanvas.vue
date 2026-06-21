@@ -99,17 +99,16 @@ function onMouseDown(e: MouseEvent) {
   const p = findPointAt(x, y)
   if (p) {
     const isRestored = isRestorationPoint(p) && p.source === 'restored'
-    if (!isRestored && !props.showRestored) {
-      return
-    }
-    dragging.value = p.id
     store.selectPoint(p.id)
+    if (isRestored) {
+      dragging.value = p.id
+    }
   }
 }
 
 function onMouseMove(e: MouseEvent) {
   const { x, y } = getCanvasLocal(e)
-  if (dragging.value !== null && props.showRestored) {
+  if (dragging.value !== null) {
     const w = screenToWorld(x, y)
     store.updateRestorationPointPos(dragging.value, w.x, w.y)
   } else {
@@ -373,18 +372,23 @@ function drawSpeculationInterval(ctx: CanvasRenderingContext2D) {
   const restoration = store.currentRestoration
   if (!restoration) return
 
+  const intervals = restoration.specIntervals
+  if (!intervals || intervals.length === 0) return
+
   ctx.save()
 
-  if (restoration.specIntervalStart !== undefined && restoration.specIntervalEnd !== undefined) {
-    const startSP = worldToScreen(0, restoration.specIntervalStart)
-    const endSP = worldToScreen(0, restoration.specIntervalEnd)
+  for (const interval of intervals) {
+    const startSP = worldToScreen(0, interval.yStart)
+    const endSP = worldToScreen(0, interval.yEnd)
+    const topY = Math.min(startSP.y, endSP.y)
+    const bottomY = Math.max(startSP.y, endSP.y)
 
     ctx.fillStyle = 'rgba(230, 81, 0, 0.08)'
     ctx.fillRect(
       viewConfig.value.padding - 30,
-      Math.min(startSP.y, endSP.y),
+      topY,
       canvasSize.value.width - 2 * viewConfig.value.padding + 60,
-      Math.abs(endSP.y - startSP.y)
+      bottomY - topY
     )
 
     ctx.strokeStyle = 'rgba(230, 81, 0, 0.3)'
@@ -401,9 +405,9 @@ function drawSpeculationInterval(ctx: CanvasRenderingContext2D) {
     ctx.font = 'bold 11px sans-serif'
     ctx.textAlign = 'right'
     ctx.fillText(
-      '推测区间',
+      interval.label,
       canvasSize.value.width - viewConfig.value.padding + 25,
-      (startSP.y + endSP.y) / 2 + 4
+      (topY + bottomY) / 2 + 4
     )
   }
 

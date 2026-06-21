@@ -1,4 +1,4 @@
-import type { ControlPoint, RestorationPoint, RestorationScheme, RestorationResult } from '@/types'
+import type { ControlPoint, RestorationPoint, RestorationScheme, RestorationResult, SpecInterval } from '@/types'
 import { sampleCurvePoints, generateId, validateProfile, calculateDimensions } from './geometry'
 
 export function analyzeProfileGaps(points: ControlPoint[]): {
@@ -279,6 +279,25 @@ export function generateRestorationScheme(
     estimated: value,
   })
 
+  const specIntervals: SpecInterval[] = []
+  if (analysis.hasBottomGap) {
+    const bottomRestoredY = restoredPoints.find(p => p.source === 'restored' && p.y <= analysis.bottomY)?.y ?? 0
+    specIntervals.push({
+      yStart: bottomRestoredY,
+      yEnd: analysis.bottomY,
+      label: '底部推测',
+    })
+  }
+  if (analysis.hasTopGap) {
+    const topOriginalY = analysis.topY
+    const topRestoredY = restoredPoints[restoredPoints.length - 1]?.y ?? topOriginalY
+    specIntervals.push({
+      yStart: topOriginalY,
+      yEnd: topRestoredY,
+      label: '口沿推测',
+    })
+  }
+
   const scheme: RestorationScheme = {
     id: generateId(),
     name: `${methodName}方案`,
@@ -293,8 +312,7 @@ export function generateRestorationScheme(
     volume: dims.volume !== null ? createRange(dims.volume) : null,
     unit,
     createdAt: Date.now(),
-    specIntervalStart: analysis.hasBottomGap ? 0 : undefined,
-    specIntervalEnd: analysis.hasTopGap ? restoredPoints[restoredPoints.length - 1]?.y : undefined,
+    specIntervals,
   }
 
   return { scheme, nextId: currentId }
@@ -412,9 +430,7 @@ export function exportRestorationData(
       method: s.method,
       confidence: s.confidence,
       unit: s.unit,
-      specInterval: s.specIntervalStart !== undefined && s.specIntervalEnd !== undefined
-        ? { startY: s.specIntervalStart, endY: s.specIntervalEnd }
-        : null,
+      specIntervals: s.specIntervals,
       dimensions: {
         mouthDiameter: s.mouthDiameter,
         bellyDiameter: s.bellyDiameter,

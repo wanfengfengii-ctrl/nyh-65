@@ -55,21 +55,18 @@ function handleDeletePoint(id: number) {
 }
 
 function loadSampleFragment() {
-  store.createNewScheme('残损陶器示例')
-  store.controlPoints.forEach((p, idx) => {
-    if (idx < store.controlPoints.length - 1) {
-      store.deletePoint(store.controlPoints[store.controlPoints.length - 1].id)
-    }
-  })
-  const samplePoints = [
+  store.clearRestorations()
+  if (!store.currentScheme) {
+    store.createNewScheme('残损陶器示例')
+  } else {
+    store.renameScheme(store.currentScheme.id, '残损陶器示例')
+  }
+  store.replacePoints([
     { x: 60, y: 80 },
     { x: 75, y: 120 },
     { x: 80, y: 160 },
     { x: 70, y: 200 },
-  ]
-  samplePoints.forEach(p => {
-    store.addPoint(p.x, p.y)
-  })
+  ])
   showFragmentInput.value = false
 }
 </script>

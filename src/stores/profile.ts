@@ -276,6 +276,19 @@ export const useProfileStore = defineStore('profile', () => {
     saveToStorage()
   }
 
+  function replacePoints(points: { x: number; y: number }[]) {
+    if (!currentScheme.value) return
+    currentScheme.value.controlPoints = points.map(p => ({
+      id: nextPointId.value++,
+      x: p.x,
+      y: p.y,
+    }))
+    currentScheme.value.repairMarks = []
+    selectedPointId.value = null
+    currentScheme.value.updatedAt = Date.now()
+    saveToStorage()
+  }
+
   function toggleRepairMark(pointId: number, description?: string) {
     if (!currentScheme.value) return
     const existing = currentScheme.value.repairMarks.find(r => r.pointId === pointId)
@@ -440,6 +453,7 @@ export const useProfileStore = defineStore('profile', () => {
     addPoint,
     deletePoint,
     resetPoints,
+    replacePoints,
     toggleRepairMark,
     exportScheme,
     generateRestorations,

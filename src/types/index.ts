@@ -188,6 +188,12 @@ export interface RestorationPoint extends ControlPoint {
   confidence: number
 }
 
+export interface SpecInterval {
+  yStart: number
+  yEnd: number
+  label: string
+}
+
 export interface RestorationScheme {
   id: string
   name: string
@@ -202,8 +208,7 @@ export interface RestorationScheme {
   volume: { min: number; max: number; estimated: number } | null
   unit: 'mm' | 'cm'
   createdAt: number
-  specIntervalStart?: number
-  specIntervalEnd?: number
+  specIntervals: SpecInterval[]
 }
 
 export interface RestorationResult {
