@@ -38,6 +38,13 @@ function handleDeletePoint(id: number) {
       </div>
       <div class="flex items-center gap-3">
         <router-link
+          to="/restoration"
+          class="px-3 py-1.5 bg-[#E65100] text-white text-xs rounded-lg hover:bg-[#BF360C] transition-colors flex items-center gap-1.5"
+        >
+          <span class="text-sm">🔄</span>
+          器物复原
+        </router-link>
+        <router-link
           to="/drainage"
           class="px-3 py-1.5 bg-[#2563EB] text-white text-xs rounded-lg hover:bg-[#1E40AF] transition-colors flex items-center gap-1.5"
         >

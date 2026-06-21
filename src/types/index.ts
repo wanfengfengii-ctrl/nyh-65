@@ -181,6 +181,38 @@ export interface SimulationResult {
   suggestion: string
 }
 
+export type PointSource = 'original' | 'restored'
+
+export interface RestorationPoint extends ControlPoint {
+  source: PointSource
+  confidence: number
+}
+
+export interface RestorationScheme {
+  id: string
+  name: string
+  originalPoints: ControlPoint[]
+  restoredPoints: RestorationPoint[]
+  method: string
+  confidence: number
+  mouthDiameter: { min: number; max: number; estimated: number }
+  bellyDiameter: { min: number; max: number; estimated: number }
+  bottomDiameter: { min: number; max: number; estimated: number }
+  height: { min: number; max: number; estimated: number }
+  volume: { min: number; max: number; estimated: number } | null
+  unit: 'mm' | 'cm'
+  createdAt: number
+  specIntervalStart?: number
+  specIntervalEnd?: number
+}
+
+export interface RestorationResult {
+  schemes: RestorationScheme[]
+  originalPoints: ControlPoint[]
+  isValid: boolean
+  errors: string[]
+}
+
 export interface ProfilePoint {
   station: number
   elevation: number

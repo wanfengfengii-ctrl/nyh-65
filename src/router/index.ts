@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomePage from '@/pages/HomePage.vue'
 import ComparePage from '@/pages/ComparePage.vue'
 import DrainagePage from '@/pages/DrainagePage.vue'
+import RestorationPage from '@/pages/RestorationPage.vue'
 
 const routes = [
   {
@@ -18,6 +19,11 @@ const routes = [
     path: '/drainage',
     name: 'drainage',
     component: DrainagePage,
+  },
+  {
+    path: '/restoration',
+    name: 'restoration',
+    component: RestorationPage,
   },
 ]
 

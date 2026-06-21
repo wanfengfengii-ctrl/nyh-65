@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { ControlPoint, ProfileScheme, RepairMark, Unit } from '@/types'
+import type { ControlPoint, ProfileScheme, RepairMark, Unit, RestorationScheme, RestorationResult } from '@/types'
 import { generateDefaultPoints, generateId } from '@/utils/geometry'
+import { generateRestorationSchemes, updateRestorationPoint, exportRestorationData } from '@/utils/restoration'
 
 const STORAGE_KEY = 'ceramic_profile_schemes'
 const CURRENT_KEY = 'ceramic_profile_current'
@@ -11,6 +12,10 @@ export const useProfileStore = defineStore('profile', () => {
   const currentSchemeId = ref<string | null>(null)
   const selectedPointId = ref<number | null>(null)
   const nextPointId = ref<number>(100)
+
+  const restorationSchemes = ref<RestorationScheme[]>([])
+  const currentRestorationId = ref<string | null>(null)
+  const restorationResult = ref<RestorationResult | null>(null)
 
   const currentScheme = computed<ProfileScheme | null>(() => {
     if (!currentSchemeId.value) return null
@@ -28,6 +33,13 @@ export const useProfileStore = defineStore('profile', () => {
   const unit = computed<Unit>(() => {
     return currentScheme.value?.unit || 'mm'
   })
+
+  const currentRestoration = computed<RestorationScheme | null>(() => {
+    if (!currentRestorationId.value) return null
+    return restorationSchemes.value.find(s => s.id === currentRestorationId.value) || null
+  })
+
+  const hasRestoration = computed(() => restorationSchemes.value.length > 0)
 
   function loadFromStorage() {
     try {
@@ -79,7 +91,9 @@ export const useProfileStore = defineStore('profile', () => {
         s.repairMarks = []
       }
 
-      s.controlPoints.sort((a: any, b: any) => a.y - b.y)
+      s.controlPoints.sort((a: any, b: any) => {
+        return a.y - b.y
+      })
     })
     return rawSchemes as ProfileScheme[]
   }
@@ -322,6 +336,84 @@ export const useProfileStore = defineStore('profile', () => {
     )
   }
 
+  function generateRestorations(): RestorationResult {
+    if (!currentScheme.value) {
+      return {
+        schemes: [],
+        originalPoints: [],
+        isValid: false,
+        errors: ['请先选择或创建一个剖面方案'],
+      }
+    }
+
+    const result = generateRestorationSchemes(
+      currentScheme.value.controlPoints,
+      currentScheme.value.unit,
+      nextPointId.value
+    )
+
+    restorationResult.value = result
+    restorationSchemes.value = result.schemes
+    currentRestorationId.value = result.schemes.length > 0 ? result.schemes[0].id : null
+
+    let maxId = nextPointId.value
+    for (const s of result.schemes) {
+      for (const p of s.restoredPoints) {
+        if (p.id > maxId) maxId = p.id
+      }
+    }
+    nextPointId.value = maxId + 1
+
+    return result
+  }
+
+  function selectRestoration(id: string | null) {
+    if (id === null || restorationSchemes.value.find(s => s.id === id)) {
+      currentRestorationId.value = id
+    }
+  }
+
+  function updateRestorationPointPos(pointId: number, x: number, y: number) {
+    if (!currentRestoration.value) return
+
+    const updated = updateRestorationPoint(currentRestoration.value, pointId, x, y)
+    const idx = restorationSchemes.value.findIndex(s => s.id === updated.id)
+    if (idx >= 0) {
+      restorationSchemes.value[idx] = updated
+    }
+  }
+
+  function clearRestorations() {
+    restorationSchemes.value = []
+    currentRestorationId.value = null
+    restorationResult.value = null
+  }
+
+  function setRestorationConfidence(schemeId: string, confidence: number) {
+    const scheme = restorationSchemes.value.find(s => s.id === schemeId)
+    if (scheme) {
+      scheme.confidence = Math.max(0, Math.min(1, confidence))
+    }
+  }
+
+  function exportRestoration(): string {
+    if (!currentScheme.value) return ''
+    return exportRestorationData(
+      { name: currentScheme.value.name, unit: currentScheme.value.unit },
+      restorationSchemes.value
+    )
+  }
+
+  function deleteRestoration(id: string) {
+    const idx = restorationSchemes.value.findIndex(s => s.id === id)
+    if (idx >= 0) {
+      restorationSchemes.value.splice(idx, 1)
+      if (currentRestorationId.value === id) {
+        currentRestorationId.value = restorationSchemes.value.length > 0 ? restorationSchemes.value[0].id : null
+      }
+    }
+  }
+
   return {
     schemes,
     currentSchemeId,
@@ -330,6 +422,11 @@ export const useProfileStore = defineStore('profile', () => {
     controlPoints,
     repairMarks,
     unit,
+    restorationSchemes,
+    currentRestorationId,
+    currentRestoration,
+    restorationResult,
+    hasRestoration,
     loadFromStorage,
     saveToStorage,
     createNewScheme,
@@ -345,5 +442,12 @@ export const useProfileStore = defineStore('profile', () => {
     resetPoints,
     toggleRepairMark,
     exportScheme,
+    generateRestorations,
+    selectRestoration,
+    updateRestorationPointPos,
+    clearRestorations,
+    setRestorationConfidence,
+    exportRestoration,
+    deleteRestoration,
   }
 })
