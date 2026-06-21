@@ -29,7 +29,7 @@ async function generateReport() {
   if (!props.culvertId) return
   generatingReport.value = true
   try {
-    const result = await api.reports.generate(props.culvertId, 'risk')
+    const result = await api.reports.generate(props.culvertId, 'sediment', true, { months: months.value })
     window.open(`http://localhost:8001${result.file_url}`, '_blank')
   } catch (e) {
     console.error('生成报告失败', e)

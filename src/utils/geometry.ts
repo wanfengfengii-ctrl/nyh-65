@@ -118,17 +118,14 @@ export function validateProfile(points: ControlPoint[]): ValidationResult {
   }
 
   if (errors.length === 0 && points.length >= 2) {
-    const bottom = getBottomPoint(points)
-    const mouth = getMouthPoint(points)
-    const bottomR = bottom ? bottom.x : 0
-    const mouthR = mouth ? mouth.x : 0
+    const bottomClosed = isBottomClosed(points)
+    const mouthR = getMouthRadius(points)
 
-    if (bottomR === 0 && mouthR === 0) {
-      warnings.push('底径和口径均为0，容量估算暂不可用（请检查控制点位置）')
-    } else if (bottomR === 0) {
+    if (!bottomClosed) {
       warnings.push('底部未闭合（底径为0），容量估算暂不可用')
-    } else if (mouthR === 0) {
-      warnings.push('口径为0，为封口/窄口器型（仍可计算容量）')
+    }
+    if (mouthR === 0 && bottomClosed) {
+      warnings.push('口径为0，为封口/窄口器型')
     }
   }
 
@@ -151,20 +148,6 @@ export function calculateDimensions(
       volume: null,
       isValid: false,
       errors: validation.errors,
-    }
-  }
-
-  const bottomPointCheck = getBottomPoint(points)
-  const bottomRadius = bottomPointCheck ? bottomPointCheck.x : 0
-  if (bottomRadius <= 0) {
-    return {
-      mouthDiameter: 0,
-      bellyDiameter: 0,
-      bottomDiameter: 0,
-      height: 0,
-      volume: null,
-      isValid: false,
-      errors: ['底部未闭合（底径为0），暂无法计算容量'],
     }
   }
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { Settings, TrendingUp, DollarSign, Clock, CheckCircle2, Play } from 'lucide-vue-next'
+import { Settings, TrendingUp, DollarSign, Clock, CheckCircle2, Play, Download } from 'lucide-vue-next'
 import { api } from '@/lib/api'
 import type { SimulationResult } from '@/types'
 
@@ -16,6 +16,7 @@ const parameters = ref<any>({
 })
 const result = ref<SimulationResult | null>(null)
 const loading = ref(false)
+const generatingReport = ref(false)
 const history = ref<SimulationResult[]>([])
 
 const planTypes = [
@@ -51,6 +52,30 @@ async function runSimulation() {
   }
 }
 
+async function exportReport() {
+  if (!props.culvertId || !result.value) return
+  generatingReport.value = true
+  try {
+    let params: Record<string, any> = {}
+    if (planType.value === 'cleaning') {
+      params = { cleaning_ratio: parameters.value.cleaning_ratio }
+    } else if (planType.value === 'expansion') {
+      params = { expansion_ratio: parameters.value.expansion_ratio }
+    } else if (planType.value === 'slope') {
+      params = { new_slope: parameters.value.new_slope }
+    }
+    const reportResult = await api.reports.generate(props.culvertId, 'simulation', true, {
+      plan_type: planType.value,
+      parameters: params
+    })
+    window.open(`http://localhost:8001${reportResult.file_url}`, '_blank')
+  } catch (e) {
+    console.error('导出报告失败', e)
+  } finally {
+    generatingReport.value = false
+  }
+}
+
 watch(() => props.culvertId, () => {
   result.value = null
   history.value = []
@@ -71,6 +96,14 @@ function formatCurrency(value: number) {
         <span class="inline-block w-1 h-5 bg-[#8B5CF6] rounded"></span>
         治理方案模拟
       </h2>
+      <button
+        :disabled="generatingReport || !result"
+        class="px-4 py-1.5 bg-[#5D8A66] text-white text-sm rounded-lg hover:bg-[#4a6f52] transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+        @click="exportReport"
+      >
+        <Download class="w-4 h-4" />
+        {{ generatingReport ? '导出中...' : '导出报告' }}
+      </button>
     </div>
 
     <div class="flex-1 flex gap-4 overflow-hidden">

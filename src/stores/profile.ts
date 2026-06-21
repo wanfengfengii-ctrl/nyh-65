@@ -1,9 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { ControlPoint, ProfileScheme, RepairMark, Unit, RestorationScheme, RestorationResult, KeyPart, Dimensions } from '@/types'
+import type { ControlPoint, ProfileScheme, RepairMark, Unit } from '@/types'
 import { generateDefaultPoints, generateId } from '@/utils/geometry'
-import { generateRestorationSchemes, updateRestorationPoint, exportRestorationData } from '@/utils/restoration'
-import { api } from '@/lib/api'
 
 const STORAGE_KEY = 'ceramic_profile_schemes'
 const CURRENT_KEY = 'ceramic_profile_current'
@@ -13,15 +11,6 @@ export const useProfileStore = defineStore('profile', () => {
   const currentSchemeId = ref<string | null>(null)
   const selectedPointId = ref<number | null>(null)
   const nextPointId = ref<number>(100)
-
-  const restorationSchemes = ref<RestorationScheme[]>([])
-  const currentRestorationId = ref<string | null>(null)
-  const restorationResult = ref<RestorationResult | null>(null)
-
-  const keyParts = ref<KeyPart[]>([])
-  const keyPartsDimensions = ref<Dimensions | null>(null)
-  const keyPartsLoading = ref<boolean>(false)
-  const keyPartsError = ref<string | null>(null)
 
   const currentScheme = computed<ProfileScheme | null>(() => {
     if (!currentSchemeId.value) return null
@@ -39,13 +28,6 @@ export const useProfileStore = defineStore('profile', () => {
   const unit = computed<Unit>(() => {
     return currentScheme.value?.unit || 'mm'
   })
-
-  const currentRestoration = computed<RestorationScheme | null>(() => {
-    if (!currentRestorationId.value) return null
-    return restorationSchemes.value.find(s => s.id === currentRestorationId.value) || null
-  })
-
-  const hasRestoration = computed(() => restorationSchemes.value.length > 0)
 
   function loadFromStorage() {
     try {
@@ -72,12 +54,8 @@ export const useProfileStore = defineStore('profile', () => {
 
   function migrateSchemes(rawSchemes: any[]): ProfileScheme[] {
     rawSchemes.forEach(s => {
-      if (!s.controlPoints || !Array.isArray(s.controlPoints)) {
-        s.controlPoints = []
-        s.repairMarks = []
-        return
-      }
-
+      if (!s.controlPoints || !Array.isArray(s.controlPoints)) return
+      s.controlPoints.sort((a: any, b: any) => a.y - b.y)
       if (s.repairMarks && Array.isArray(s.repairMarks)) {
         s.repairMarks = s.repairMarks
           .map((r: any) => {
@@ -96,10 +74,6 @@ export const useProfileStore = defineStore('profile', () => {
       } else {
         s.repairMarks = []
       }
-
-      s.controlPoints.sort((a: any, b: any) => {
-        return a.y - b.y
-      })
     })
     return rawSchemes as ProfileScheme[]
   }
@@ -211,15 +185,14 @@ export const useProfileStore = defineStore('profile', () => {
     if (!currentScheme.value) return
     const p = currentScheme.value.controlPoints.find(p => p.id === id)
     if (p) {
-      const oldX = p.x
-      const oldY = p.y
       p.x = Math.max(0, x)
+      const oldY = p.y
       p.y = Math.max(0, y)
-      if (Math.abs(oldY - p.y) > 0.001 || Math.abs(oldX - p.x) > 0.001) {
+      if (Math.abs(oldY - p.y) > 0.1) {
         currentScheme.value.controlPoints.sort((a, b) => a.y - b.y)
-        currentScheme.value.updatedAt = Date.now()
-        saveToStorage()
       }
+      currentScheme.value.updatedAt = Date.now()
+      saveToStorage()
     }
   }
 
@@ -282,19 +255,6 @@ export const useProfileStore = defineStore('profile', () => {
     saveToStorage()
   }
 
-  function replacePoints(points: { x: number; y: number }[]) {
-    if (!currentScheme.value) return
-    currentScheme.value.controlPoints = points.map(p => ({
-      id: nextPointId.value++,
-      x: p.x,
-      y: p.y,
-    }))
-    currentScheme.value.repairMarks = []
-    selectedPointId.value = null
-    currentScheme.value.updatedAt = Date.now()
-    saveToStorage()
-  }
-
   function toggleRepairMark(pointId: number, description?: string) {
     if (!currentScheme.value) return
     const existing = currentScheme.value.repairMarks.find(r => r.pointId === pointId)
@@ -314,158 +274,31 @@ export const useProfileStore = defineStore('profile', () => {
     if (!s) return ''
     const sortedPoints = [...s.controlPoints].sort((a, b) => a.y - b.y)
     const repairMarkPointIds = new Set(s.repairMarks.map(r => r.pointId))
-    const repairMarkMap = new Map(s.repairMarks.map(r => [r.pointId, r]))
     return JSON.stringify(
       {
         name: s.name,
         unit: s.unit,
         exportTime: new Date().toISOString(),
-        totalPoints: sortedPoints.length,
-        totalRepairMarks: s.repairMarks.length,
-        controlPoints: sortedPoints.map((p, i) => {
-          const mark = repairMarkMap.get(p.id)
-          return {
-            index: i,
-            position: i === 0 ? '底部' : i === sortedPoints.length - 1 ? '口沿' : '中间',
-            id: p.id,
-            x: Number(p.x.toFixed(3)),
-            y: Number(p.y.toFixed(3)),
-            radius: Number(p.x.toFixed(3)),
-            height: Number(p.y.toFixed(3)),
-            isRepairMark: repairMarkPointIds.has(p.id),
-            repairDescription: mark?.description || null,
-          }
-        }),
+        controlPoints: sortedPoints.map((p, i) => ({
+          index: i,
+          id: p.id,
+          x: p.x,
+          y: p.y,
+          isRepairMark: repairMarkPointIds.has(p.id),
+        })),
         repairMarks: s.repairMarks.map(r => {
           const pointIdx = sortedPoints.findIndex(p => p.id === r.pointId)
-          const point = sortedPoints[pointIdx]
           return {
             pointIndex: pointIdx,
-            pointNumber: pointIdx >= 0 ? pointIdx + 1 : null,
             pointId: r.pointId,
-            pointX: point ? point.x : null,
-            pointY: point ? point.y : null,
             description: r.description,
           }
         }),
-        orderNote: '控制点按高度从低到高排序（底部→口沿），为剖面曲线标准顺序。index从0开始，pointNumber从1开始。',
+        orderNote: '控制点按高度从低到高排序（底部到口沿），为剖面曲线标准顺序',
       },
       null,
       2
     )
-  }
-
-  function generateRestorations(): RestorationResult {
-    if (!currentScheme.value) {
-      return {
-        schemes: [],
-        originalPoints: [],
-        isValid: false,
-        errors: ['请先选择或创建一个剖面方案'],
-      }
-    }
-
-    const result = generateRestorationSchemes(
-      currentScheme.value.controlPoints,
-      currentScheme.value.unit,
-      nextPointId.value
-    )
-
-    restorationResult.value = result
-    restorationSchemes.value = result.schemes
-    currentRestorationId.value = result.schemes.length > 0 ? result.schemes[0].id : null
-
-    let maxId = nextPointId.value
-    for (const s of result.schemes) {
-      for (const p of s.restoredPoints) {
-        if (p.id > maxId) maxId = p.id
-      }
-    }
-    nextPointId.value = maxId + 1
-
-    return result
-  }
-
-  function selectRestoration(id: string | null) {
-    if (id === null || restorationSchemes.value.find(s => s.id === id)) {
-      currentRestorationId.value = id
-    }
-  }
-
-  function updateRestorationPointPos(pointId: number, x: number, y: number) {
-    if (!currentRestoration.value) return
-
-    const updated = updateRestorationPoint(currentRestoration.value, pointId, x, y)
-    const idx = restorationSchemes.value.findIndex(s => s.id === updated.id)
-    if (idx >= 0) {
-      restorationSchemes.value[idx] = updated
-    }
-  }
-
-  function clearRestorations() {
-    restorationSchemes.value = []
-    currentRestorationId.value = null
-    restorationResult.value = null
-  }
-
-  function setRestorationConfidence(schemeId: string, confidence: number) {
-    const scheme = restorationSchemes.value.find(s => s.id === schemeId)
-    if (scheme) {
-      scheme.confidence = Math.max(0, Math.min(1, confidence))
-    }
-  }
-
-  function exportRestoration(): string {
-    if (!currentScheme.value) return ''
-    return exportRestorationData(
-      { name: currentScheme.value.name, unit: currentScheme.value.unit },
-      restorationSchemes.value
-    )
-  }
-
-  function deleteRestoration(id: string) {
-    const idx = restorationSchemes.value.findIndex(s => s.id === id)
-    if (idx >= 0) {
-      restorationSchemes.value.splice(idx, 1)
-      if (currentRestorationId.value === id) {
-        currentRestorationId.value = restorationSchemes.value.length > 0 ? restorationSchemes.value[0].id : null
-      }
-    }
-  }
-
-  async function identifyKeyParts(vesselTypeHint?: string): Promise<{ success: boolean; message?: string }> {
-    if (!currentScheme.value || controlPoints.value.length < 3) {
-      return { success: false, message: '控制点数量不足（至少需要3个）' }
-    }
-    keyPartsLoading.value = true
-    keyPartsError.value = null
-    try {
-      const res = await api.vesselProfiles.identifyKeyParts({
-        control_points: controlPoints.value,
-        unit: unit.value,
-        vessel_type_hint: vesselTypeHint,
-      })
-      if (res && res.success) {
-        keyParts.value = res.key_parts || []
-        keyPartsDimensions.value = res.dimensions || null
-        return { success: true }
-      } else {
-        keyPartsError.value = '识别失败'
-        return { success: false, message: '识别失败' }
-      }
-    } catch (e: any) {
-      console.error('识别关键部位失败:', e)
-      keyPartsError.value = e?.message || '网络请求失败'
-      return { success: false, message: e?.message || '网络请求失败' }
-    } finally {
-      keyPartsLoading.value = false
-    }
-  }
-
-  function clearKeyParts() {
-    keyParts.value = []
-    keyPartsDimensions.value = null
-    keyPartsError.value = null
   }
 
   return {
@@ -476,15 +309,6 @@ export const useProfileStore = defineStore('profile', () => {
     controlPoints,
     repairMarks,
     unit,
-    restorationSchemes,
-    currentRestorationId,
-    currentRestoration,
-    restorationResult,
-    hasRestoration,
-    keyParts,
-    keyPartsDimensions,
-    keyPartsLoading,
-    keyPartsError,
     loadFromStorage,
     saveToStorage,
     createNewScheme,
@@ -498,17 +322,7 @@ export const useProfileStore = defineStore('profile', () => {
     addPoint,
     deletePoint,
     resetPoints,
-    replacePoints,
     toggleRepairMark,
     exportScheme,
-    generateRestorations,
-    selectRestoration,
-    updateRestorationPointPos,
-    clearRestorations,
-    setRestorationConfidence,
-    exportRestoration,
-    deleteRestoration,
-    identifyKeyParts,
-    clearKeyParts,
   }
 })

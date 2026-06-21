@@ -1,0 +1,41 @@
+{
+  "report_id": "d5d7c3a0-a1ec-49fd-a301-bc5df384df74",
+  "report_type": "治理方案模拟报告",
+  "generated_at": "2026-06-21T19:42:12.228926",
+  "culvert_info": {
+    "id": 1,
+    "name": "东大街排水暗渠",
+    "code": "DD-001",
+    "location": "古城东大街",
+    "length": 520.0,
+    "material": "砖石结构",
+    "construction_year": 1958,
+    "status": "正常"
+  },
+  "simulation_config": {
+    "plan_type": "cleaning",
+    "plan_type_name": "清淤方案",
+    "parameters": {
+      "cleaning_ratio": 0.8
+    }
+  },
+  "simulation_result": {
+    "plan_type": "清淤方案",
+    "original_capacity": 5.798,
+    "simulated_capacity": 6.734,
+    "capacity_improvement": 0.937,
+    "cost_estimate": 22966.4,
+    "construction_period": "10 天",
+    "suggestion": "清淤比例 80.0%，预计清除淤积量 262.08 立方米"
+  },
+  "summary": {
+    "original_capacity": 5.798,
+    "simulated_capacity": 6.734,
+    "capacity_improvement": 0.937,
+    "improvement_ratio": 16.16,
+    "cost_estimate": 22966.4,
+    "construction_period": "10 天",
+    "suggestion": "清淤比例 80.0%，预计清除淤积量 262.08 立方米"
+  },
+  "include_charts": true
+}

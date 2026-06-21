@@ -1,0 +1,39 @@
+{
+  "report_id": "a0be2002-d093-4665-aa83-4a573a7d7406",
+  "report_type": "淤积趋势分析报告",
+  "generated_at": "2026-06-21T19:42:10.151299",
+  "analysis_period_months": 12,
+  "culvert_info": {
+    "id": 1,
+    "name": "东大街排水暗渠",
+    "code": "DD-001",
+    "location": "古城东大街",
+    "length": 520.0,
+    "material": "砖石结构",
+    "construction_year": 1958,
+    "status": "正常"
+  },
+  "sediment_trend_analysis": {
+    "culvert_id": 1,
+    "culvert_name": "东大街排水暗渠",
+    "trend_points": [],
+    "avg_sediment_rate": 0,
+    "max_thickness": 0,
+    "predicted_thickness_6m": 0,
+    "predicted_thickness_12m": 0,
+    "risk_level": "低"
+  },
+  "summary": {
+    "avg_sediment_rate_mm_month": 0,
+    "max_thickness_cm": 0,
+    "predicted_6m_cm": 0,
+    "predicted_12m_cm": 0,
+    "risk_level": "低",
+    "total_records": 0,
+    "recommendations": [
+      "建立季度淤积监测机制，跟踪淤积变化趋势",
+      "完善排水系统维护档案，记录每次清淤作业详情"
+    ]
+  },
+  "include_charts": true
+}

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
-import type { ControlPoint, KeyPart } from '@/types'
+import type { ControlPoint } from '@/types'
 import { useProfileStore } from '@/stores/profile'
 import { catmullRomToBezier, sampleCurvePoints, checkSelfIntersection, validateProfile } from '@/utils/geometry'
 
@@ -134,7 +134,6 @@ function draw() {
   drawGrid(ctx)
   drawAxis(ctx)
   drawMirroredProfile(ctx)
-  drawKeyParts(ctx)
   drawProfileCurve(ctx)
   drawRepairMarks(ctx)
   drawControlPoints(ctx)
@@ -278,128 +277,6 @@ function drawMirroredProfile(ctx: CanvasRenderingContext2D) {
   ctx.restore()
 }
 
-const KEY_PART_COLORS: Record<string, { fill: string; stroke: string; text: string }> = {
-  '底部': { fill: 'rgba(139, 90, 43, 0.15)', stroke: '#8B5A2B', text: '#5D3A1A' },
-  '圈足': { fill: 'rgba(139, 90, 43, 0.18)', stroke: '#A0522D', text: '#5D3A1A' },
-  '足': { fill: 'rgba(139, 90, 43, 0.18)', stroke: '#A0522D', text: '#5D3A1A' },
-  '腹部': { fill: 'rgba(93, 138, 102, 0.18)', stroke: '#5D8A66', text: '#3A5A40' },
-  '腹': { fill: 'rgba(93, 138, 102, 0.18)', stroke: '#5D8A66', text: '#3A5A40' },
-  '肩部': { fill: 'rgba(0, 128, 128, 0.18)', stroke: '#008080', text: '#005555' },
-  '肩': { fill: 'rgba(0, 128, 128, 0.18)', stroke: '#008080', text: '#005555' },
-  '颈部': { fill: 'rgba(123, 31, 162, 0.15)', stroke: '#7B1FA2', text: '#4A148C' },
-  '颈': { fill: 'rgba(123, 31, 162, 0.15)', stroke: '#7B1FA2', text: '#4A148C' },
-  '口沿': { fill: 'rgba(229, 57, 53, 0.15)', stroke: '#E53935', text: '#B71C1C' },
-  '口': { fill: 'rgba(229, 57, 53, 0.15)', stroke: '#E53935', text: '#B71C1C' },
-}
-
-function getKeyPartColor(name: string) {
-  return KEY_PART_COLORS[name] || { fill: 'rgba(158, 158, 158, 0.15)', stroke: '#9E9E9E', text: '#616161' }
-}
-
-function drawKeyParts(ctx: CanvasRenderingContext2D) {
-  const parts = store.keyParts
-  const pts = store.controlPoints
-  if (parts.length === 0 || pts.length < 2) return
-
-  const sampled = sampleCurvePoints(pts, 60)
-  if (sampled.length === 0) return
-
-  ctx.save()
-
-  for (const part of parts) {
-    const { startY, endY, name, diameter, confidence } = part
-    if (startY === undefined || endY === undefined) continue
-    if (Math.abs(endY - startY) < 0.001) continue
-
-    const color = getKeyPartColor(name)
-
-    const topScreen = worldToScreen(0, Math.max(startY, endY))
-    const botScreen = worldToScreen(0, Math.min(startY, endY))
-    const yTop = topScreen.y
-    const yBot = botScreen.y
-    const axisX = topScreen.x
-
-    const sampleCount = 20
-    const regionPoints: { x: number; y: number }[] = []
-    for (let i = 0; i <= sampleCount; i++) {
-      const t = i / sampleCount
-      const y = startY + (endY - startY) * t
-      let r = 0
-      let nearest: any = null
-      let minDist = Infinity
-      for (const sp of sampled) {
-        const d = Math.abs(sp.y - y)
-        if (d < minDist) {
-          minDist = d
-          nearest = sp
-        }
-      }
-      if (nearest) {
-        r = nearest.x
-      }
-      const sp1 = worldToScreen(r, y)
-      const sp2 = worldToScreen(-r, y)
-      regionPoints.push({ x: sp1.x, y: sp1.y })
-      regionPoints.unshift({ x: sp2.x, y: sp2.y })
-    }
-
-    if (regionPoints.length > 0) {
-      ctx.beginPath()
-      ctx.moveTo(regionPoints[0].x, regionPoints[0].y)
-      for (let i = 1; i < regionPoints.length; i++) {
-        ctx.lineTo(regionPoints[i].x, regionPoints[i].y)
-      }
-      ctx.closePath()
-      ctx.fillStyle = color.fill
-      ctx.fill()
-    }
-
-    ctx.strokeStyle = color.stroke
-    ctx.lineWidth = 1
-    ctx.setLineDash([4, 3])
-    ctx.beginPath()
-    ctx.moveTo(axisX - 30, yTop)
-    ctx.lineTo(axisX + 30, yTop)
-    ctx.stroke()
-    ctx.beginPath()
-    ctx.moveTo(axisX - 30, yBot)
-    ctx.lineTo(axisX + 30, yBot)
-    ctx.stroke()
-    ctx.setLineDash([])
-
-    let maxR = 0
-    for (const sp of sampled) {
-      if (sp.y >= Math.min(startY, endY) && sp.y <= Math.max(startY, endY)) {
-        if (sp.x > maxR) maxR = sp.x
-      }
-    }
-    const labelY = (yTop + yBot) / 2
-    const labelSP = worldToScreen(maxR + 8, (startY + endY) / 2)
-    const labelText = diameter !== undefined
-      ? `${name} ${diameter.toFixed(0)}${store.unit}`
-      : name
-    const confText = confidence !== undefined ? ` ${(confidence * 100).toFixed(0)}%` : ''
-
-    ctx.font = 'bold 10.5px sans-serif'
-    ctx.textAlign = 'left'
-    const textWidth = ctx.measureText(labelText + confText).width
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
-    ctx.fillRect(labelSP.x - 2, labelY - 9, textWidth + 10, 16)
-    ctx.strokeStyle = color.stroke
-    ctx.lineWidth = 0.8
-    ctx.strokeRect(labelSP.x - 2, labelY - 9, textWidth + 10, 16)
-    ctx.fillStyle = color.text
-    ctx.fillText(labelText, labelSP.x + 3, labelY + 2.5)
-    if (confText) {
-      ctx.fillStyle = confidence && confidence < 0.6 ? '#E65100' : '#555'
-      ctx.font = '10px sans-serif'
-      ctx.fillText(confText, labelSP.x + 3 + ctx.measureText(labelText).width, labelY + 2.5)
-    }
-  }
-
-  ctx.restore()
-}
-
 function drawControlPoints(ctx: CanvasRenderingContext2D) {
   const pts = store.controlPoints
   const repairPointIds = new Set(store.repairMarks.map(r => r.pointId))
@@ -437,10 +314,7 @@ function drawControlPoints(ctx: CanvasRenderingContext2D) {
     ctx.fillStyle = '#666'
     ctx.font = '10px sans-serif'
     ctx.textAlign = 'center'
-    let label = String(i + 1)
-    if (i === 0) label = '①底'
-    else if (i === pts.length - 1) label = '①口'
-    ctx.fillText(label, sp.x, sp.y + 20)
+    ctx.fillText(String(i + 1), sp.x, sp.y + 20)
   }
   ctx.restore()
 }
@@ -511,7 +385,7 @@ onUnmounted(() => {
 })
 
 watch(
-  () => [store.controlPoints, store.unit, store.selectedPointId, store.repairMarks, store.keyParts],
+  () => [store.controlPoints, store.unit, store.selectedPointId, store.repairMarks],
   () => {
     draw()
   },

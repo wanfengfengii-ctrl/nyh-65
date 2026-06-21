@@ -1,0 +1,58 @@
+{
+  "report_id": "de8fb010-fe0d-4f46-bb82-a6722d5e7d7f",
+  "report_type": "纵断面图数据报告",
+  "generated_at": "2026-06-21T19:42:14.286626",
+  "culvert_info": {
+    "id": 1,
+    "name": "东大街排水暗渠",
+    "code": "DD-001",
+    "location": "古城东大街",
+    "length": 520.0,
+    "material": "砖石结构",
+    "construction_year": 1958,
+    "status": "正常"
+  },
+  "profile_data": {
+    "culvert_id": 1,
+    "culvert_name": "东大街排水暗渠",
+    "profile_points": [
+      {
+        "station": 0.0,
+        "elevation": 12.5,
+        "section_width": 2.0,
+        "section_height": 2.5,
+        "sediment_thickness": 0.35,
+        "manhole_name": "1号检查井"
+      },
+      {
+        "station": 200.0,
+        "elevation": 9.4,
+        "section_width": 2.0,
+        "section_height": 2.5,
+        "sediment_thickness": 0.35,
+        "manhole_name": "2号检查井"
+      },
+      {
+        "station": 520.0,
+        "elevation": 11.72,
+        "section_width": 2.0,
+        "section_height": 2.5,
+        "sediment_thickness": 0.85,
+        "manhole_name": "3号检查井"
+      }
+    ],
+    "max_elevation": 12.5,
+    "min_elevation": 9.4,
+    "avg_slope": 0.00596
+  },
+  "summary": {
+    "max_elevation": 12.5,
+    "min_elevation": 9.4,
+    "elevation_drop": 3.1,
+    "avg_slope_permil": 5.96,
+    "total_profile_points": 3,
+    "manhole_count": 3,
+    "section_count": 3
+  },
+  "include_charts": true
+}

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, computed } from 'vue'
-import { MapPin, ArrowDown, Download, Info } from 'lucide-vue-next'
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
+import { MapPin, ArrowDown, Download, Info, FileJson, Image } from 'lucide-vue-next'
 import { api } from '@/lib/api'
 import type { ProfileResult } from '@/types'
 
@@ -12,6 +12,8 @@ const result = ref<ProfileResult | null>(null)
 const loading = ref(false)
 const showTooltip = ref(false)
 const tooltipPoint = ref<any>(null)
+const generatingReport = ref(false)
+const showExportMenu = ref(false)
 
 async function loadProfile() {
   if (!props.culvertId) return
@@ -30,6 +32,21 @@ watch(() => props.culvertId, (id) => {
     loadProfile()
   }
 }, { immediate: true })
+
+function handleClickOutside(event: MouseEvent) {
+  const target = event.target as HTMLElement
+  if (!target.closest('.relative') && showExportMenu.value) {
+    showExportMenu.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
 
 const svgWidth = ref(800)
 const svgHeight = ref(400)
@@ -107,6 +124,91 @@ function showPointTooltip(point: any, event: MouseEvent) {
 function hideTooltip() {
   showTooltip.value = false
 }
+
+async function exportDataReport() {
+  if (!props.culvertId) return
+  generatingReport.value = true
+  showExportMenu.value = false
+  try {
+    const reportResult = await api.reports.generate(props.culvertId, 'profile', true)
+    window.open(`http://localhost:8001${reportResult.file_url}`, '_blank')
+  } catch (e) {
+    console.error('导出报告失败', e)
+  } finally {
+    generatingReport.value = false
+  }
+}
+
+function exportSvgImage() {
+  showExportMenu.value = false
+  const svgElement = document.querySelector('.profile-svg-container svg') as SVGSVGElement
+  if (!svgElement) return
+
+  const serializer = new XMLSerializer()
+  let source = serializer.serializeToString(svgElement)
+
+  if (!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) {
+    source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"')
+  }
+  if (!source.match(/^<svg[^>]+"http\:\/\/www\.w3\.org\/1999\/xlink"/)) {
+    source = source.replace(/^<svg/, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"')
+  }
+
+  source = '<?xml version="1.0" standalone="no"?>\r\n' + source
+
+  const url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(source)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `纵断面图_${result.value?.culvert_name || 'profile'}_${Date.now()}.svg`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
+
+function exportPngImage() {
+  showExportMenu.value = false
+  const svgElement = document.querySelector('.profile-svg-container svg') as SVGSVGElement
+  if (!svgElement) return
+
+  const serializer = new XMLSerializer()
+  let source = serializer.serializeToString(svgElement)
+
+  if (!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) {
+    source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"')
+  }
+
+  const svgBlob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' })
+  const url = URL.createObjectURL(svgBlob)
+
+  const img = new Image()
+  img.onload = function() {
+    const canvas = document.createElement('canvas')
+    canvas.width = svgWidth.value * 2
+    canvas.height = svgHeight.value * 2
+    const ctx = canvas.getContext('2d')
+    if (ctx) {
+      ctx.fillStyle = 'white'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.scale(2, 2)
+      ctx.drawImage(img, 0, 0)
+      URL.revokeObjectURL(url)
+
+      canvas.toBlob(function(blob) {
+        if (blob) {
+          const pngUrl = URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = pngUrl
+          link.download = `纵断面图_${result.value?.culvert_name || 'profile'}_${Date.now()}.png`
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          URL.revokeObjectURL(pngUrl)
+        }
+      }, 'image/png')
+    }
+  }
+  img.src = url
+}
 </script>
 
 <template>
@@ -116,9 +218,47 @@ function hideTooltip() {
         <span class="inline-block w-1 h-5 bg-[#10B981] rounded"></span>
         纵断面图展示
       </h2>
-      <div class="flex items-center gap-2 text-sm text-gray-500">
-        <Info class="w-4 h-4" />
-        <span>点击图上的点查看详细信息</span>
+      <div class="flex items-center gap-2 relative">
+        <div class="flex items-center gap-2 text-sm text-gray-500 mr-2">
+          <Info class="w-4 h-4" />
+          <span>点击图上的点查看详细信息</span>
+        </div>
+        <div class="relative">
+          <button
+            :disabled="generatingReport || !result"
+            class="px-4 py-1.5 bg-[#5D8A66] text-white text-sm rounded-lg hover:bg-[#4a6f52] transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            @click="showExportMenu = !showExportMenu"
+          >
+            <Download class="w-4 h-4" />
+            导出
+          </button>
+          <div
+            v-if="showExportMenu"
+            class="absolute right-0 top-full mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20"
+          >
+            <button
+              class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              @click="exportDataReport"
+            >
+              <FileJson class="w-4 h-4 text-blue-500" />
+              导出数据报告 (JSON)
+            </button>
+            <button
+              class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              @click="exportSvgImage"
+            >
+              <Image class="w-4 h-4 text-green-500" />
+              导出图片 (SVG)
+            </button>
+            <button
+              class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              @click="exportPngImage"
+            >
+              <Image class="w-4 h-4 text-purple-500" />
+              导出图片 (PNG)
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -152,7 +292,7 @@ function hideTooltip() {
           </div>
         </div>
 
-        <div class="flex-1 relative overflow-auto bg-gray-50 rounded-lg border border-gray-200 p-4">
+        <div class="flex-1 relative overflow-auto bg-gray-50 rounded-lg border border-gray-200 p-4 profile-svg-container">
           <svg :width="svgWidth" :height="svgHeight" class="mx-auto">
             <defs>
               <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
