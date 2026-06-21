@@ -54,8 +54,12 @@ export const useProfileStore = defineStore('profile', () => {
 
   function migrateSchemes(rawSchemes: any[]): ProfileScheme[] {
     rawSchemes.forEach(s => {
-      if (!s.controlPoints || !Array.isArray(s.controlPoints)) return
-      s.controlPoints.sort((a: any, b: any) => a.y - b.y)
+      if (!s.controlPoints || !Array.isArray(s.controlPoints)) {
+        s.controlPoints = []
+        s.repairMarks = []
+        return
+      }
+
       if (s.repairMarks && Array.isArray(s.repairMarks)) {
         s.repairMarks = s.repairMarks
           .map((r: any) => {
@@ -74,6 +78,8 @@ export const useProfileStore = defineStore('profile', () => {
       } else {
         s.repairMarks = []
       }
+
+      s.controlPoints.sort((a: any, b: any) => a.y - b.y)
     })
     return rawSchemes as ProfileScheme[]
   }
@@ -185,14 +191,15 @@ export const useProfileStore = defineStore('profile', () => {
     if (!currentScheme.value) return
     const p = currentScheme.value.controlPoints.find(p => p.id === id)
     if (p) {
-      p.x = Math.max(0, x)
+      const oldX = p.x
       const oldY = p.y
+      p.x = Math.max(0, x)
       p.y = Math.max(0, y)
-      if (Math.abs(oldY - p.y) > 0.1) {
+      if (Math.abs(oldY - p.y) > 0.001 || Math.abs(oldX - p.x) > 0.001) {
         currentScheme.value.controlPoints.sort((a, b) => a.y - b.y)
+        currentScheme.value.updatedAt = Date.now()
+        saveToStorage()
       }
-      currentScheme.value.updatedAt = Date.now()
-      saveToStorage()
     }
   }
 
@@ -274,27 +281,41 @@ export const useProfileStore = defineStore('profile', () => {
     if (!s) return ''
     const sortedPoints = [...s.controlPoints].sort((a, b) => a.y - b.y)
     const repairMarkPointIds = new Set(s.repairMarks.map(r => r.pointId))
+    const repairMarkMap = new Map(s.repairMarks.map(r => [r.pointId, r]))
     return JSON.stringify(
       {
         name: s.name,
         unit: s.unit,
         exportTime: new Date().toISOString(),
-        controlPoints: sortedPoints.map((p, i) => ({
-          index: i,
-          id: p.id,
-          x: p.x,
-          y: p.y,
-          isRepairMark: repairMarkPointIds.has(p.id),
-        })),
+        totalPoints: sortedPoints.length,
+        totalRepairMarks: s.repairMarks.length,
+        controlPoints: sortedPoints.map((p, i) => {
+          const mark = repairMarkMap.get(p.id)
+          return {
+            index: i,
+            position: i === 0 ? '底部' : i === sortedPoints.length - 1 ? '口沿' : '中间',
+            id: p.id,
+            x: Number(p.x.toFixed(3)),
+            y: Number(p.y.toFixed(3)),
+            radius: Number(p.x.toFixed(3)),
+            height: Number(p.y.toFixed(3)),
+            isRepairMark: repairMarkPointIds.has(p.id),
+            repairDescription: mark?.description || null,
+          }
+        }),
         repairMarks: s.repairMarks.map(r => {
           const pointIdx = sortedPoints.findIndex(p => p.id === r.pointId)
+          const point = sortedPoints[pointIdx]
           return {
             pointIndex: pointIdx,
+            pointNumber: pointIdx >= 0 ? pointIdx + 1 : null,
             pointId: r.pointId,
+            pointX: point ? point.x : null,
+            pointY: point ? point.y : null,
             description: r.description,
           }
         }),
-        orderNote: '控制点按高度从低到高排序（底部到口沿），为剖面曲线标准顺序',
+        orderNote: '控制点按高度从低到高排序（底部→口沿），为剖面曲线标准顺序。index从0开始，pointNumber从1开始。',
       },
       null,
       2

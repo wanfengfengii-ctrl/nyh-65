@@ -314,7 +314,10 @@ function drawControlPoints(ctx: CanvasRenderingContext2D) {
     ctx.fillStyle = '#666'
     ctx.font = '10px sans-serif'
     ctx.textAlign = 'center'
-    ctx.fillText(String(i + 1), sp.x, sp.y + 20)
+    let label = String(i + 1)
+    if (i === 0) label = '①底'
+    else if (i === pts.length - 1) label = '①口'
+    ctx.fillText(label, sp.x, sp.y + 20)
   }
   ctx.restore()
 }

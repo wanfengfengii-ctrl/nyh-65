@@ -25,7 +25,21 @@ const repairMarksDisplay = computed(() => {
 })
 
 const canCalculateVolume = computed(() => {
-  return isBottomClosed(store.controlPoints)
+  const bottom = store.controlPoints.length > 0
+    ? store.controlPoints.reduce((best, p) => (p.y < best.y ? p : best), store.controlPoints[0])
+    : null
+  return bottom ? bottom.x > 0 : false
+})
+
+const volumeBlockReason = computed(() => {
+  if (store.controlPoints.length < 2) return null
+  const bottom = store.controlPoints.reduce((best, p) => (p.y < best.y ? p : best), store.controlPoints[0])
+  const mouth = store.controlPoints.reduce((best, p) => (p.y > best.y ? p : best), store.controlPoints[0])
+  const bottomR = bottom ? bottom.x : 0
+  const mouthR = mouth ? mouth.x : 0
+  if (bottomR === 0 && mouthR === 0) return '底径和口径均为0，请检查控制点位置'
+  if (bottomR === 0) return '底部未闭合（底径为0），暂无法计算容量'
+  return null
 })
 
 function formatNumber(v: number | null, digits: number = 1): string {
@@ -125,13 +139,13 @@ defineExpose({ exportJson })
         {{ canCalculateVolume && result.isValid ? formatNumber(result.volume, 1) : '--' }}
         <span class="text-sm font-normal text-gray-500 ml-1">mL</span>
       </div>
-      <div v-if="!canCalculateVolume" class="mt-2 text-xs text-amber-600 flex items-start gap-1">
+      <div v-if="volumeBlockReason" class="mt-2 text-xs text-amber-600 flex items-start gap-1">
         <AlertTriangle class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-        <span>底部未闭合（底径为0），暂无法计算容量</span>
+        <span>{{ volumeBlockReason }}</span>
       </div>
-      <div v-if="canCalculateVolume && !result.isValid" class="mt-2 text-xs text-amber-600 flex items-start gap-1">
+      <div v-else-if="!result.isValid && result.errors.length > 0" class="mt-2 text-xs text-amber-600 flex items-start gap-1">
         <AlertTriangle class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-        <span>数据校验不通过，暂无法计算容量</span>
+        <span>{{ result.errors[0] }}</span>
       </div>
       <div v-if="validation.warnings.length > 0" class="mt-2 space-y-1">
         <div v-for="(w, i) in validation.warnings" :key="i" class="text-xs text-amber-600 flex items-start gap-1">
