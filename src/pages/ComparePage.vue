@@ -54,6 +54,8 @@ function exportAllComparison() {
     exportTime: new Date().toISOString(),
     schemes: selectedSchemes.value.map(s => {
       const r = calculateDimensions(s.controlPoints, s.unit)
+      const sortedPoints = [...s.controlPoints].sort((a, b) => a.y - b.y)
+      const repairMarkPointIds = new Set(s.repairMarks.map(rm => rm.pointId))
       return {
         name: s.name,
         unit: s.unit,
@@ -64,11 +66,12 @@ function exportAllComparison() {
           bottomDiameter: r.bottomDiameter,
           volumeMl: r.volume,
         },
-        controlPoints: s.controlPoints.map((p, i) => ({
+        controlPoints: sortedPoints.map((p, i) => ({
           index: i,
+          id: p.id,
           x: p.x,
           y: p.y,
-          isRepairMark: s.repairMarks.some(rm => rm.pointIndex === i),
+          isRepairMark: repairMarkPointIds.has(p.id),
         })),
       }
     }),

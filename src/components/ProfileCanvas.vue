@@ -279,7 +279,7 @@ function drawMirroredProfile(ctx: CanvasRenderingContext2D) {
 
 function drawControlPoints(ctx: CanvasRenderingContext2D) {
   const pts = store.controlPoints
-  const repairIndices = new Set(store.repairMarks.map(r => r.pointIndex))
+  const repairPointIds = new Set(store.repairMarks.map(r => r.pointId))
   ctx.save()
 
   for (let i = 0; i < pts.length; i++) {
@@ -287,7 +287,7 @@ function drawControlPoints(ctx: CanvasRenderingContext2D) {
     const sp = worldToScreen(p.x, p.y)
     const isSelected = store.selectedPointId === p.id
     const isHover = hoverPoint.value === p.id
-    const isRepair = repairIndices.has(i)
+    const isRepair = repairPointIds.has(p.id)
 
     if (isRepair) {
       ctx.fillStyle = '#FF7043'
@@ -320,16 +320,16 @@ function drawControlPoints(ctx: CanvasRenderingContext2D) {
 }
 
 function drawRepairMarks(ctx: CanvasRenderingContext2D) {
-  const repairIndices = store.repairMarks.map(r => r.pointIndex)
-  if (repairIndices.length === 0) return
+  if (store.repairMarks.length === 0) return
   const pts = store.controlPoints
+  const pointMap = new Map(pts.map(p => [p.id, p]))
   ctx.save()
   ctx.fillStyle = '#FF7043'
   ctx.font = 'bold 14px sans-serif'
   ctx.textAlign = 'left'
-  for (const idx of repairIndices) {
-    if (idx < pts.length) {
-      const p = pts[idx]
+  for (const m of store.repairMarks) {
+    const p = pointMap.get(m.pointId)
+    if (p) {
       const sp = worldToScreen(p.x, p.y)
       ctx.fillText('⚒', sp.x + 10, sp.y - 14)
     }

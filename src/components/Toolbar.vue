@@ -65,8 +65,8 @@ function confirmRename(id: string) {
 }
 
 function toggleRepair() {
-  if (selectedIndex.value >= 0) {
-    store.toggleRepairMark(selectedIndex.value)
+  if (store.selectedPointId !== null) {
+    store.toggleRepairMark(store.selectedPointId)
   }
 }
 

@@ -2,17 +2,30 @@
 import { computed } from 'vue'
 import { Ruler, CircleDot, FlaskConical, AlertTriangle, CheckCircle2, XCircle } from 'lucide-vue-next'
 import { useProfileStore } from '@/stores/profile'
-import { calculateDimensions, validateProfile } from '@/utils/geometry'
+import { calculateDimensions, validateProfile, isBottomClosed } from '@/utils/geometry'
 
 const store = useProfileStore()
 
 const validation = computed(() => validateProfile(store.controlPoints))
 const result = computed(() => calculateDimensions(store.controlPoints, store.unit))
 
+const repairMarksDisplay = computed(() => {
+  const sortedPoints = [...store.controlPoints].sort((a, b) => a.y - b.y)
+  return store.repairMarks
+    .map(m => {
+      const idx = sortedPoints.findIndex(p => p.id === m.pointId)
+      return {
+        ...m,
+        pointIndex: idx,
+        pointNumber: idx >= 0 ? idx + 1 : null,
+      }
+    })
+    .filter(m => m.pointNumber !== null)
+    .sort((a, b) => (a.pointIndex ?? 0) - (b.pointIndex ?? 0))
+})
+
 const canCalculateVolume = computed(() => {
-  const pts = store.controlPoints
-  if (pts.length < 2) return false
-  return pts[0].x > 0 && pts[pts.length - 1].x > 0
+  return isBottomClosed(store.controlPoints)
 })
 
 function formatNumber(v: number | null, digits: number = 1): string {
@@ -114,7 +127,17 @@ defineExpose({ exportJson })
       </div>
       <div v-if="!canCalculateVolume" class="mt-2 text-xs text-amber-600 flex items-start gap-1">
         <AlertTriangle class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-        <span>需底部和口径均大于0才能计算容量（底部需闭合）</span>
+        <span>底部未闭合（底径为0），暂无法计算容量</span>
+      </div>
+      <div v-if="canCalculateVolume && !result.isValid" class="mt-2 text-xs text-amber-600 flex items-start gap-1">
+        <AlertTriangle class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+        <span>数据校验不通过，暂无法计算容量</span>
+      </div>
+      <div v-if="validation.warnings.length > 0" class="mt-2 space-y-1">
+        <div v-for="(w, i) in validation.warnings" :key="i" class="text-xs text-amber-600 flex items-start gap-1">
+          <AlertTriangle class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+          <span>{{ w }}</span>
+        </div>
       </div>
     </div>
 
@@ -151,15 +174,15 @@ defineExpose({ exportJson })
       </div>
     </div>
 
-    <div v-if="store.repairMarks.length > 0" class="mt-2">
-      <div class="text-xs font-semibold text-gray-600 mb-2">修坯标记（{{ store.repairMarks.length }}）</div>
+    <div v-if="repairMarksDisplay.length > 0" class="mt-2">
+      <div class="text-xs font-semibold text-gray-600 mb-2">修坯标记（{{ repairMarksDisplay.length }}）</div>
       <div class="space-y-1">
         <div
-          v-for="m in store.repairMarks"
-          :key="m.pointIndex"
+          v-for="m in repairMarksDisplay"
+          :key="m.pointId"
           class="flex items-center justify-between px-2 py-1.5 bg-orange-50 rounded border border-orange-200 text-xs"
         >
-          <span class="text-orange-700">⚒ 控制点 {{ m.pointIndex + 1 }}</span>
+          <span class="text-orange-700">⚒ 控制点 {{ m.pointNumber }}</span>
           <span v-if="m.description" class="text-gray-500 truncate max-w-[120px]">{{ m.description }}</span>
         </div>
       </div>

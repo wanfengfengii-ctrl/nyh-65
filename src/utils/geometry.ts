@@ -71,9 +71,25 @@ export function checkSelfIntersection(sampled: { x: number; y: number }[]): bool
   return false
 }
 
+export function getBottomPoint(points: ControlPoint[]): ControlPoint | null {
+  if (points.length === 0) return null
+  return points.reduce((best, p) => (p.y < best.y ? p : best), points[0])
+}
+
+export function getMouthPoint(points: ControlPoint[]): ControlPoint | null {
+  if (points.length === 0) return null
+  return points.reduce((best, p) => (p.y > best.y ? p : best), points[0])
+}
+
 export function isBottomClosed(points: ControlPoint[]): boolean {
-  if (points.length < 2) return false
-  return points[0].x > 0 && points[points.length - 1].x > 0
+  const bottom = getBottomPoint(points)
+  if (!bottom) return false
+  return bottom.x > 0
+}
+
+export function getMouthRadius(points: ControlPoint[]): number {
+  const mouth = getMouthPoint(points)
+  return mouth ? mouth.x : 0
 }
 
 export function validateProfile(points: ControlPoint[]): ValidationResult {
@@ -101,8 +117,16 @@ export function validateProfile(points: ControlPoint[]): ValidationResult {
     }
   }
 
-  if (errors.length === 0 && !isBottomClosed(points)) {
-    warnings.push('底部未闭合，容量估算暂不可用（需底径>0且口径>0）')
+  if (errors.length === 0 && points.length >= 2) {
+    const bottomClosed = isBottomClosed(points)
+    const mouthR = getMouthRadius(points)
+
+    if (!bottomClosed) {
+      warnings.push('底部未闭合（底径为0），容量估算暂不可用')
+    }
+    if (mouthR === 0 && bottomClosed) {
+      warnings.push('口径为0，为封口/窄口器型')
+    }
   }
 
   return { isValid: errors.length === 0, errors, warnings }

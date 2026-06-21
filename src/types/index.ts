@@ -5,7 +5,7 @@ export interface ControlPoint {
 }
 
 export interface RepairMark {
-  pointIndex: number
+  pointId: number
   description?: string
 }
 

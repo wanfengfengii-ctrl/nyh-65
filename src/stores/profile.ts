@@ -33,7 +33,8 @@ export const useProfileStore = defineStore('profile', () => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
       if (saved) {
-        schemes.value = JSON.parse(saved)
+        const raw = JSON.parse(saved)
+        schemes.value = migrateSchemes(raw)
       }
       const savedCurrent = localStorage.getItem(CURRENT_KEY)
       if (savedCurrent && schemes.value.find(s => s.id === savedCurrent)) {
@@ -46,8 +47,35 @@ export const useProfileStore = defineStore('profile', () => {
       }
       syncMaxPointId()
     } catch (e) {
+      console.error('加载数据失败', e)
       createNewScheme('默认罐型')
     }
+  }
+
+  function migrateSchemes(rawSchemes: any[]): ProfileScheme[] {
+    rawSchemes.forEach(s => {
+      if (!s.controlPoints || !Array.isArray(s.controlPoints)) return
+      s.controlPoints.sort((a: any, b: any) => a.y - b.y)
+      if (s.repairMarks && Array.isArray(s.repairMarks)) {
+        s.repairMarks = s.repairMarks
+          .map((r: any) => {
+            if (r.pointId !== undefined && r.pointId !== null) {
+              return r
+            }
+            if (r.pointIndex !== undefined && r.pointIndex !== null) {
+              const point = s.controlPoints[r.pointIndex]
+              if (point && point.id !== undefined) {
+                return { pointId: point.id, description: r.description }
+              }
+            }
+            return null
+          })
+          .filter(Boolean)
+      } else {
+        s.repairMarks = []
+      }
+    })
+    return rawSchemes as ProfileScheme[]
   }
 
   function syncMaxPointId() {
@@ -122,12 +150,21 @@ export const useProfileStore = defineStore('profile', () => {
     const s = schemes.value.find(s => s.id === id)
     if (!s) return
     const now = Date.now()
+    const idMap = new Map<number, number>()
+    const newPoints = s.controlPoints.map(p => {
+      const newId = nextPointId.value++
+      idMap.set(p.id, newId)
+      return { ...p, id: newId }
+    })
+    const newRepairMarks = s.repairMarks
+      .filter(r => idMap.has(r.pointId))
+      .map(r => ({ ...r, pointId: idMap.get(r.pointId)! }))
     const copy: ProfileScheme = {
       id: generateId(),
       name: s.name + ' (副本)',
       unit: s.unit,
-      controlPoints: s.controlPoints.map(p => ({ ...p, id: nextPointId.value++ })),
-      repairMarks: s.repairMarks.map(r => ({ ...r })),
+      controlPoints: newPoints,
+      repairMarks: newRepairMarks,
       createdAt: now,
       updatedAt: now,
     }
@@ -149,7 +186,11 @@ export const useProfileStore = defineStore('profile', () => {
     const p = currentScheme.value.controlPoints.find(p => p.id === id)
     if (p) {
       p.x = Math.max(0, x)
+      const oldY = p.y
       p.y = Math.max(0, y)
+      if (Math.abs(oldY - p.y) > 0.1) {
+        currentScheme.value.controlPoints.sort((a, b) => a.y - b.y)
+      }
       currentScheme.value.updatedAt = Date.now()
       saveToStorage()
     }
@@ -159,7 +200,7 @@ export const useProfileStore = defineStore('profile', () => {
     selectedPointId.value = id
   }
 
-  function addPoint(x: number, y: number, insertIndex?: number) {
+  function addPoint(x: number, y: number) {
     if (!currentScheme.value) return
     const newP: ControlPoint = {
       id: nextPointId.value++,
@@ -167,12 +208,19 @@ export const useProfileStore = defineStore('profile', () => {
       y: Math.max(0, y),
     }
     const pts = currentScheme.value.controlPoints
-    if (typeof insertIndex === 'number' && insertIndex >= 0 && insertIndex < pts.length) {
-      pts.splice(insertIndex, 0, newP)
-    } else {
-      pts.push(newP)
+
+    let lo = 0
+    let hi = pts.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (pts[mid].y < newP.y) {
+        lo = mid + 1
+      } else {
+        hi = mid
+      }
     }
-    pts.sort((a, b) => a.y - b.y)
+    pts.splice(lo, 0, newP)
+
     currentScheme.value.updatedAt = Date.now()
     saveToStorage()
     return newP.id
@@ -185,7 +233,7 @@ export const useProfileStore = defineStore('profile', () => {
     if (idx >= 0) {
       currentScheme.value.controlPoints.splice(idx, 1)
       currentScheme.value.repairMarks = currentScheme.value.repairMarks.filter(
-        r => r.pointIndex !== idx
+        r => r.pointId !== id
       )
       if (selectedPointId.value === id) {
         selectedPointId.value = null
@@ -207,15 +255,15 @@ export const useProfileStore = defineStore('profile', () => {
     saveToStorage()
   }
 
-  function toggleRepairMark(pointIndex: number, description?: string) {
+  function toggleRepairMark(pointId: number, description?: string) {
     if (!currentScheme.value) return
-    const existing = currentScheme.value.repairMarks.find(r => r.pointIndex === pointIndex)
+    const existing = currentScheme.value.repairMarks.find(r => r.pointId === pointId)
     if (existing) {
       currentScheme.value.repairMarks = currentScheme.value.repairMarks.filter(
-        r => r.pointIndex !== pointIndex
+        r => r.pointId !== pointId
       )
     } else {
-      currentScheme.value.repairMarks.push({ pointIndex, description })
+      currentScheme.value.repairMarks.push({ pointId, description })
     }
     currentScheme.value.updatedAt = Date.now()
     saveToStorage()
@@ -224,18 +272,29 @@ export const useProfileStore = defineStore('profile', () => {
   function exportScheme(id: string): string {
     const s = schemes.value.find(s => s.id === id)
     if (!s) return ''
+    const sortedPoints = [...s.controlPoints].sort((a, b) => a.y - b.y)
+    const repairMarkPointIds = new Set(s.repairMarks.map(r => r.pointId))
     return JSON.stringify(
       {
         name: s.name,
         unit: s.unit,
         exportTime: new Date().toISOString(),
-        controlPoints: s.controlPoints.map((p, i) => ({
+        controlPoints: sortedPoints.map((p, i) => ({
           index: i,
+          id: p.id,
           x: p.x,
           y: p.y,
-          isRepairMark: s.repairMarks.some(r => r.pointIndex === i),
+          isRepairMark: repairMarkPointIds.has(p.id),
         })),
-        repairMarks: s.repairMarks,
+        repairMarks: s.repairMarks.map(r => {
+          const pointIdx = sortedPoints.findIndex(p => p.id === r.pointId)
+          return {
+            pointIndex: pointIdx,
+            pointId: r.pointId,
+            description: r.description,
+          }
+        }),
+        orderNote: '控制点按高度从低到高排序（底部到口沿），为剖面曲线标准顺序',
       },
       null,
       2
