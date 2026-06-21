@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Boolean
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Boolean, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
@@ -140,3 +140,156 @@ class RiskWarning(Base):
     suggestion = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
     is_acknowledged = Column(Boolean, default=False)
+
+
+class CeramicVesselTemplate(Base):
+    __tablename__ = "ceramic_vessel_templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    code = Column(String(50), unique=True, nullable=False)
+    category = Column(String(50), nullable=False)
+    dynasty = Column(String(50))
+    region = Column(String(100))
+    material = Column(String(50))
+    typical_height = Column(Float)
+    typical_mouth_diameter = Column(Float)
+    typical_belly_diameter = Column(Float)
+    typical_bottom_diameter = Column(Float)
+    typical_volume = Column(Float)
+    control_points = Column(JSON, nullable=False)
+    key_parts = Column(JSON)
+    parameters = Column(JSON)
+    description = Column(Text)
+    references = Column(Text)
+    image_url = Column(String(255))
+    is_public = Column(Boolean, default=True)
+    created_by = Column(String(50))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    versions = relationship("VesselVersion", back_populates="template", cascade="all, delete-orphan")
+
+
+class VesselProfile(Base):
+    __tablename__ = "vessel_profiles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    code = Column(String(50), unique=True, nullable=False)
+    template_id = Column(Integer, ForeignKey("ceramic_vessel_templates.id"))
+    unit = Column(String(10), default="mm")
+    vessel_type = Column(String(50))
+    dynasty = Column(String(50))
+    provenance = Column(String(255))
+    material = Column(String(50))
+    condition_status = Column(String(20), default="完整")
+    control_points = Column(JSON, nullable=False)
+    repair_marks = Column(JSON)
+    key_parts_identified = Column(JSON)
+    dimensions = Column(JSON)
+    parameters = Column(JSON)
+    is_restored = Column(Boolean, default=False)
+    restoration_method = Column(String(50))
+    restoration_confidence = Column(Float)
+    description = Column(Text)
+    tags = Column(JSON)
+    created_by = Column(String(50))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    template = relationship("CeramicVesselTemplate")
+    versions = relationship("VesselVersion", back_populates="profile", cascade="all, delete-orphan", foreign_keys="VesselVersion.profile_id")
+    reports = relationship("ResearchReport", back_populates="profile", cascade="all, delete-orphan")
+
+
+class VesselVersion(Base):
+    __tablename__ = "vessel_versions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    profile_id = Column(Integer, ForeignKey("vessel_profiles.id"))
+    template_id = Column(Integer, ForeignKey("ceramic_vessel_templates.id"))
+    version_number = Column(Integer, nullable=False)
+    version_label = Column(String(100))
+    change_summary = Column(Text)
+    control_points = Column(JSON)
+    repair_marks = Column(JSON)
+    dimensions = Column(JSON)
+    key_parts_identified = Column(JSON)
+    parameters = Column(JSON)
+    restoration_confidence = Column(Float)
+    parent_version_id = Column(Integer, ForeignKey("vessel_versions.id"))
+    created_by = Column(String(50))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    profile = relationship("VesselProfile", back_populates="versions", foreign_keys=[profile_id])
+    template = relationship("CeramicVesselTemplate", back_populates="versions", foreign_keys=[template_id])
+    parent = relationship("VesselVersion", remote_side=[id])
+
+
+class DifferenceAnalysis(Base):
+    __tablename__ = "difference_analyses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    profile_a_id = Column(Integer, ForeignKey("vessel_profiles.id"))
+    profile_b_id = Column(Integer, ForeignKey("vessel_profiles.id"))
+    template_id = Column(Integer, ForeignKey("ceramic_vessel_templates.id"))
+    analysis_type = Column(String(30), default="profile")
+    heatmap_data = Column(JSON)
+    key_differences = Column(JSON)
+    overall_similarity = Column(Float)
+    dimension_differences = Column(JSON)
+    description = Column(Text)
+    created_by = Column(String(50))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    profile_a = relationship("VesselProfile", foreign_keys=[profile_a_id])
+    profile_b = relationship("VesselProfile", foreign_keys=[profile_b_id])
+    template = relationship("CeramicVesselTemplate", foreign_keys=[template_id])
+
+
+class RestorationAssessment(Base):
+    __tablename__ = "restoration_assessments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    profile_id = Column(Integer, ForeignKey("vessel_profiles.id"), nullable=False)
+    overall_confidence = Column(Float, nullable=False)
+    bottom_confidence = Column(Float)
+    mouth_confidence = Column(Float)
+    belly_confidence = Column(Float)
+    neck_confidence = Column(Float)
+    shoulder_confidence = Column(Float)
+    foot_confidence = Column(Float)
+    fragment_coverage = Column(Float)
+    gap_count = Column(Integer)
+    critical_gaps = Column(JSON)
+    supporting_evidence = Column(JSON)
+    risk_factors = Column(JSON)
+    recommendations = Column(JSON)
+    assessment_method = Column(String(50))
+    assessed_by = Column(String(50))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    profile = relationship("VesselProfile")
+
+
+class ResearchReport(Base):
+    __tablename__ = "research_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    profile_id = Column(Integer, ForeignKey("vessel_profiles.id"), nullable=False)
+    title = Column(String(255), nullable=False)
+    report_type = Column(String(50), default="器型分析报告")
+    content = Column(JSON, nullable=False)
+    sections = Column(JSON)
+    summary = Column(Text)
+    conclusions = Column(JSON)
+    file_path = Column(String(255))
+    file_format = Column(String(20), default="json")
+    author = Column(String(50))
+    keywords = Column(JSON)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    profile = relationship("VesselProfile", back_populates="reports")

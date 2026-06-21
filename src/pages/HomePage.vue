@@ -38,11 +38,39 @@ function handleDeletePoint(id: number) {
       </div>
       <div class="flex items-center gap-3">
         <router-link
+          to="/templates"
+          class="px-3 py-1.5 bg-[#5D8A66] text-white text-xs rounded-lg hover:bg-[#4a6f52] transition-colors flex items-center gap-1.5"
+        >
+          <span class="text-sm">📚</span>
+          标准模板库
+        </router-link>
+        <router-link
+          to="/archive"
+          class="px-3 py-1.5 bg-[#8B6914] text-white text-xs rounded-lg hover:bg-[#6d5210] transition-colors flex items-center gap-1.5"
+        >
+          <span class="text-sm">🏺</span>
+          器型档案
+        </router-link>
+        <router-link
+          to="/intelligent"
+          class="px-3 py-1.5 bg-[#7B1FA2] text-white text-xs rounded-lg hover:bg-[#6A1B9A] transition-colors flex items-center gap-1.5"
+        >
+          <span class="text-sm">🧠</span>
+          智能分析
+        </router-link>
+        <router-link
           to="/restoration"
           class="px-3 py-1.5 bg-[#E65100] text-white text-xs rounded-lg hover:bg-[#BF360C] transition-colors flex items-center gap-1.5"
         >
           <span class="text-sm">🔄</span>
           器物复原
+        </router-link>
+        <router-link
+          to="/compare"
+          class="px-3 py-1.5 bg-[#1565C0] text-white text-xs rounded-lg hover:bg-[#0D47A1] transition-colors flex items-center gap-1.5"
+        >
+          <span class="text-sm">📊</span>
+          方案对比
         </router-link>
         <router-link
           to="/drainage"

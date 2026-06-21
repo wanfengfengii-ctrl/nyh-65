@@ -4,13 +4,16 @@ from database import engine, Base
 from datetime import datetime
 
 from routers import culverts, sections, slopes, manholes, sediment, scenarios, analysis, reports
+from routers import templates as templates_router
+from routers import vessel_profiles as vessel_profiles_router
+from routers import ceramic as ceramic_router
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="古城地下排水暗渠管理与风险分析系统",
-    description="面向多情景研判的古城地下排水暗渠管理系统，支持暗渠、检查井、断面尺寸、坡度及淤积记录管理，提供降雨情景排水能力对比、淤积趋势分析、高风险区段预警、清淤或断面调整方案模拟、纵断面图展示及风险报告输出等功能。",
-    version="2.0.0"
+    title="陶瓷器型智能分析系统",
+    description="面向陶瓷研究人员的器型智能分析系统。支持剖面绘制、3D预览、尺寸估算、容量计算、方案对比、修坯标记、残损复原、标准器型模板库、关键部位自动识别、参数化尺寸联动编辑、复原方案可信度评估、器型差异热区分析、历史版本追踪和研究报告导出等功能，支持对完整器与残损器进行统一建模、复原、比对和结构化数据输出。",
+    version="3.0.0"
 )
 
 app.add_middleware(
@@ -29,18 +32,27 @@ app.include_router(sediment.router)
 app.include_router(scenarios.router)
 app.include_router(analysis.router)
 app.include_router(reports.router)
+app.include_router(templates_router.router)
+app.include_router(vessel_profiles_router.router)
+app.include_router(ceramic_router.router)
 
 
 @app.get("/")
 def root():
     return {
-        "name": "古城地下排水暗渠管理与风险分析系统",
-        "version": "2.0.0",
-        "description": "面向多情景研判的古城地下排水暗渠管理系统",
+        "name": "陶瓷器型智能分析系统",
+        "version": "3.0.0",
+        "description": "面向陶瓷研究人员的器型智能分析系统",
         "status": "running",
         "start_time": datetime.utcnow().isoformat(),
         "docs": "/docs",
-        "api_prefix": "/api"
+        "api_prefix": "/api",
+        "modules": [
+            "剖面绘制", "3D预览", "尺寸估算", "容量计算",
+            "方案对比", "修坯标记", "残损复原",
+            "标准器型模板库", "关键部位识别", "参数化尺寸联动",
+            "可信度评估", "差异热区分析", "历史版本追踪", "研究报告导出"
+        ]
     }
 
 
@@ -312,7 +324,248 @@ def init_sample_data():
         db.close()
 
 
+def init_ceramic_sample_data():
+    from database import SessionLocal
+    from models import CeramicVesselTemplate, VesselProfile
+
+    db = SessionLocal()
+    try:
+        if db.query(CeramicVesselTemplate).count() == 0:
+            standard_templates = [
+                {
+                    "name": "唐代典型罐型",
+                    "code": "TPL-TANG-GUAN-001",
+                    "category": "罐",
+                    "dynasty": "唐代",
+                    "region": "中原地区",
+                    "material": "青瓷",
+                    "points": [
+                        {"id": 1, "x": 50, "y": 0},
+                        {"id": 2, "x": 65, "y": 30},
+                        {"id": 3, "x": 90, "y": 80},
+                        {"id": 4, "x": 110, "y": 150},
+                        {"id": 5, "x": 100, "y": 220},
+                        {"id": 6, "x": 75, "y": 270},
+                        {"id": 7, "x": 55, "y": 300},
+                    ],
+                    "description": "唐代典型圆腹罐，鼓腹、短颈、平底，常见于中原窑口。",
+                    "references": "《中国陶瓷史》唐代部分",
+                },
+                {
+                    "name": "宋代梅瓶",
+                    "code": "TPL-SONG-MEIPING-001",
+                    "category": "瓶",
+                    "dynasty": "宋代",
+                    "region": "景德镇窑系",
+                    "material": "青白瓷",
+                    "points": [
+                        {"id": 1, "x": 35, "y": 0},
+                        {"id": 2, "x": 45, "y": 40},
+                        {"id": 3, "x": 60, "y": 80},
+                        {"id": 4, "x": 95, "y": 150},
+                        {"id": 5, "x": 100, "y": 220},
+                        {"id": 6, "x": 80, "y": 280},
+                        {"id": 7, "x": 50, "y": 320},
+                        {"id": 8, "x": 25, "y": 350},
+                        {"id": 9, "x": 20, "y": 380},
+                    ],
+                    "description": "宋代梅瓶标准器型，小口、短颈、丰肩、敛腹、圈足。",
+                    "references": "宋代景德镇青白瓷梅瓶标准参考",
+                },
+                {
+                    "name": "元代青花大盘",
+                    "code": "TPL-YUAN-PAN-001",
+                    "category": "盘",
+                    "dynasty": "元代",
+                    "region": "景德镇",
+                    "material": "青花瓷",
+                    "points": [
+                        {"id": 1, "x": 90, "y": 0},
+                        {"id": 2, "x": 105, "y": 15},
+                        {"id": 3, "x": 120, "y": 25},
+                        {"id": 4, "x": 180, "y": 35},
+                        {"id": 5, "x": 200, "y": 45},
+                    ],
+                    "description": "元代青花大盘，折沿、浅腹、平底，口径通常在40cm以上。",
+                    "references": "元青花典型器型参考",
+                },
+                {
+                    "name": "明代玉壶春瓶",
+                    "code": "TPL-MING-YUHUCHUN-001",
+                    "category": "瓶",
+                    "dynasty": "明代",
+                    "region": "景德镇官窑",
+                    "material": "青花/釉里红",
+                    "points": [
+                        {"id": 1, "x": 45, "y": 0},
+                        {"id": 2, "x": 55, "y": 30},
+                        {"id": 3, "x": 60, "y": 60},
+                        {"id": 4, "x": 40, "y": 90},
+                        {"id": 5, "x": 30, "y": 130},
+                        {"id": 6, "x": 25, "y": 170},
+                        {"id": 7, "x": 30, "y": 210},
+                        {"id": 8, "x": 50, "y": 240},
+                        {"id": 9, "x": 45, "y": 270},
+                        {"id": 10, "x": 30, "y": 290},
+                        {"id": 11, "x": 35, "y": 310},
+                    ],
+                    "description": "玉壶春瓶为明代经典器型，撇口、细颈、垂腹、圈足。",
+                    "references": "明代官窑瓷器标准器型",
+                },
+                {
+                    "name": "清代康熙将军罐",
+                    "code": "TPL-QING-JIANGJUN-001",
+                    "category": "罐",
+                    "dynasty": "清代康熙",
+                    "region": "景德镇",
+                    "material": "青花/五彩",
+                    "points": [
+                        {"id": 1, "x": 55, "y": 0},
+                        {"id": 2, "x": 75, "y": 50},
+                        {"id": 3, "x": 105, "y": 120},
+                        {"id": 4, "x": 115, "y": 200},
+                        {"id": 5, "x": 100, "y": 280},
+                        {"id": 6, "x": 70, "y": 340},
+                        {"id": 7, "x": 50, "y": 380},
+                        {"id": 8, "x": 55, "y": 410},
+                    ],
+                    "description": "将军罐，直口、丰肩、敛腹、平底，器型高大挺拔，因宝珠顶盖形似将军盔帽得名。",
+                    "references": "清代康熙青花瓷器研究",
+                },
+                {
+                    "name": "龙山文化蛋壳黑陶杯",
+                    "code": "TPL-LONGSHAN-EGGSHELL-001",
+                    "category": "杯",
+                    "dynasty": "新石器时代龙山",
+                    "region": "山东龙山",
+                    "material": "黑陶",
+                    "points": [
+                        {"id": 1, "x": 20, "y": 0},
+                        {"id": 2, "x": 18, "y": 40},
+                        {"id": 3, "x": 22, "y": 70},
+                        {"id": 4, "x": 28, "y": 90},
+                        {"id": 5, "x": 35, "y": 110},
+                        {"id": 6, "x": 40, "y": 125},
+                    ],
+                    "description": "龙山文化蛋壳黑陶高柄杯，器薄如蛋壳，代表史前制陶最高水平。",
+                    "references": "《山东龙山文化陶器研究》",
+                },
+                {
+                    "name": "宋代官窑鬲式炉",
+                    "code": "TPL-SONG-GEYAO-LISHILU-001",
+                    "category": "炉",
+                    "dynasty": "宋代",
+                    "region": "官窑",
+                    "material": "青瓷",
+                    "points": [
+                        {"id": 1, "x": 15, "y": 0},
+                        {"id": 2, "x": 25, "y": 20},
+                        {"id": 3, "x": 45, "y": 40},
+                        {"id": 4, "x": 65, "y": 60},
+                        {"id": 5, "x": 60, "y": 80},
+                        {"id": 6, "x": 40, "y": 100},
+                    ],
+                    "description": "鬲式炉仿青铜器鬲造型，宋代官窑常见器型，用于焚香。",
+                    "references": "宋代官窑瓷器标准参考",
+                },
+            ]
+
+            for tpl_data in standard_templates:
+                tpl = CeramicVesselTemplate(
+                    name=tpl_data["name"],
+                    code=tpl_data["code"],
+                    category=tpl_data["category"],
+                    dynasty=tpl_data["dynasty"],
+                    region=tpl_data["region"],
+                    material=tpl_data["material"],
+                    control_points=tpl_data["points"],
+                    description=tpl_data["description"],
+                    references=tpl_data["references"],
+                    is_public=True,
+                    created_by="system",
+                )
+                db.add(tpl)
+
+            if db.query(VesselProfile).count() == 0:
+                sample_profiles = [
+                    {
+                        "name": "XX窑出土唐代青瓷罐",
+                        "code": "VP-TANG-001",
+                        "template_idx": 0,
+                        "vessel_type": "罐",
+                        "dynasty": "唐代",
+                        "provenance": "河南省XX市XX窑址",
+                        "material": "青瓷",
+                        "condition_status": "完整",
+                        "description": "1985年窑址发掘出土，器型规整，釉色青中泛黄。",
+                        "tags": ["出土品", "青瓷", "唐代", "窑址"],
+                        "scale_factor": 0.95,
+                    },
+                    {
+                        "name": "馆藏宋代青白瓷梅瓶",
+                        "code": "VP-SONG-002",
+                        "template_idx": 1,
+                        "vessel_type": "瓶",
+                        "dynasty": "南宋",
+                        "provenance": "江西省XX市",
+                        "material": "青白瓷",
+                        "condition_status": "残损",
+                        "is_restored": True,
+                        "restoration_method": "适中",
+                        "description": "口沿有残损，经复原处理，肩部有开片纹。",
+                        "tags": ["馆藏", "青白瓷", "宋代", "残损复原"],
+                        "scale_factor": 1.05,
+                    },
+                ]
+
+                db.flush()
+                all_templates = db.query(CeramicVesselTemplate).all()
+                tpl_list = list(all_templates)
+
+                for prof_data in sample_profiles:
+                    tpl = tpl_list[prof_data.get("template_idx", 0)]
+                    scale = prof_data.get("scale_factor", 1.0)
+                    cps = [
+                        {"id": i, "x": p["x"] * scale, "y": p["y"] * scale}
+                        for i, p in enumerate(tpl.control_points, start=1)
+                    ]
+                    if prof_data.get("condition_status") == "残损":
+                        cps = cps[:max(3, len(cps) - 2)]
+
+                    profile = VesselProfile(
+                        name=prof_data["name"],
+                        code=prof_data["code"],
+                        template_id=tpl.id,
+                        unit="mm",
+                        vessel_type=prof_data.get("vessel_type"),
+                        dynasty=prof_data.get("dynasty"),
+                        provenance=prof_data.get("provenance"),
+                        material=prof_data.get("material"),
+                        condition_status=prof_data.get("condition_status", "完整"),
+                        control_points=cps,
+                        repair_marks=[],
+                        is_restored=prof_data.get("is_restored", False),
+                        restoration_method=prof_data.get("restoration_method"),
+                        description=prof_data.get("description"),
+                        tags=prof_data.get("tags"),
+                        created_by="system",
+                    )
+                    db.add(profile)
+
+            db.commit()
+            print("陶瓷器型示例数据初始化完成（7个模板，2个档案）")
+
+    except Exception as e:
+        db.rollback()
+        print(f"初始化陶瓷数据时出错: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        db.close()
+
+
 init_sample_data()
+init_ceramic_sample_data()
 
 if __name__ == "__main__":
     import uvicorn
