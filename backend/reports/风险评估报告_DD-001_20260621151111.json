@@ -1,0 +1,107 @@
+{
+  "report_id": "3785b37d-2c3e-482d-9176-9358693c9080",
+  "report_type": "风险评估报告",
+  "generated_at": "2026-06-21T15:11:11.902654",
+  "culvert_info": {
+    "id": 1,
+    "name": "东大街排水暗渠",
+    "code": "DD-001",
+    "location": "古城东大街",
+    "length": 520.0,
+    "material": "砖石结构",
+    "construction_year": 1958,
+    "status": "正常"
+  },
+  "sediment_trend_analysis": {
+    "culvert_id": 1,
+    "culvert_name": "东大街排水暗渠",
+    "trend_points": [],
+    "avg_sediment_rate": 0,
+    "max_thickness": 0,
+    "predicted_thickness_6m": 0,
+    "predicted_thickness_12m": 0,
+    "risk_level": "低"
+  },
+  "risk_warnings": {
+    "culvert_id": 1,
+    "culvert_name": "东大街排水暗渠",
+    "total_risk_sections": 3,
+    "high_risk_count": 1,
+    "medium_risk_count": 1,
+    "low_risk_count": 1,
+    "risk_sections": [
+      {
+        "start_station": 400.0,
+        "end_station": 520.0,
+        "risk_level": "高",
+        "risk_score": 86.0,
+        "description": "桩号 400.0 - 520.0 米处淤积厚度 0.92 米",
+        "suggestion": "建议立即清淤，该区域淤积严重，已严重影响排水能力"
+      },
+      {
+        "start_station": 200.0,
+        "end_station": 400.0,
+        "risk_level": "中",
+        "risk_score": 72.0,
+        "description": "桩号 200.0 - 400.0 米处淤积厚度 0.72 米",
+        "suggestion": "建议3个月内安排清淤，该区域淤积已影响排水效率"
+      },
+      {
+        "start_station": 0.0,
+        "end_station": 200.0,
+        "risk_level": "低",
+        "risk_score": 32.0,
+        "description": "桩号 0.0 - 200.0 米处淤积厚度 0.42 米",
+        "suggestion": "建议纳入年度清淤计划，定期监测淤积情况"
+      }
+    ]
+  },
+  "profile_data": {
+    "culvert_id": 1,
+    "culvert_name": "东大街排水暗渠",
+    "profile_points": [
+      {
+        "station": 0.0,
+        "elevation": 12.5,
+        "section_width": 2.0,
+        "section_height": 2.5,
+        "sediment_thickness": 0.35,
+        "manhole_name": "1号检查井"
+      },
+      {
+        "station": 200.0,
+        "elevation": 9.4,
+        "section_width": 2.0,
+        "section_height": 2.5,
+        "sediment_thickness": 0.35,
+        "manhole_name": "2号检查井"
+      },
+      {
+        "station": 520.0,
+        "elevation": 11.72,
+        "section_width": 2.0,
+        "section_height": 2.5,
+        "sediment_thickness": 0.85,
+        "manhole_name": "3号检查井"
+      }
+    ],
+    "max_elevation": 12.5,
+    "min_elevation": 9.4,
+    "avg_slope": 0.00596
+  },
+  "summary": {
+    "overall_risk_level": "低",
+    "total_risk_sections": 3,
+    "high_risk_count": 1,
+    "medium_risk_count": 1,
+    "low_risk_count": 1,
+    "recommendations": [
+      "立即对高风险区段进行清淤作业，消除安全隐患",
+      "在3个月内安排对中风险区段的清淤工作",
+      "建立定期监测机制，每季度进行一次淤积检测",
+      "完善排水系统维护档案，记录每次清淤和检修情况",
+      "根据淤积速率预测，制定年度清淤计划"
+    ]
+  },
+  "include_charts": true
+}

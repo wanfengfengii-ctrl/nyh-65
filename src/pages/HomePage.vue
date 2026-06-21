@@ -37,6 +37,13 @@ function handleDeletePoint(id: number) {
         </div>
       </div>
       <div class="flex items-center gap-3">
+        <router-link
+          to="/drainage"
+          class="px-3 py-1.5 bg-[#2563EB] text-white text-xs rounded-lg hover:bg-[#1E40AF] transition-colors flex items-center gap-1.5"
+        >
+          <span class="text-sm">💧</span>
+          排水系统
+        </router-link>
         <div
           v-if="store.currentScheme"
           class="px-3 py-1 bg-[#FAF6ED] rounded-lg border border-[#E8DFC9] text-xs text-[#5D4E2B]"
